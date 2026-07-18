@@ -11,7 +11,8 @@
 ## Global Constraints
 
 - 생성 모델 기본값: `claude-opus-4-8` (환경변수 `HORCRUX_MODEL`로 교체)
-- 임베딩 기본값: `google/embeddinggemma-300m` (환경변수 `HORCRUX_EMBED_MODEL`로 교체. HF 게이트 접근 불가 시 코드 수정 없이 env로 `intfloat/multilingual-e5-small` 폴백)
+- 검색 모드: `HORCRUX_SEARCH` = auto|llm|vector (기본 auto — 레코드 수 ≤ `HORCRUX_SEARCH_THRESHOLD`(기본 200)이면 LLM-select, 초과면 vector). diagnose는 `retrieval.retrieve()`만 호출
+- 임베딩: 어댑터(`embeddings.py`). `HORCRUX_EMBED_PROVIDER` = local|gemini|voyage (기본 local — sentence-transformers, gemini/voyage는 NotImplementedError 자리만). `HORCRUX_EMBED_MODEL` 기본 `google/embeddinggemma-300m` (HF 게이트 접근 불가 시 env로 `intfloat/multilingual-e5-small` 폴백). sentence-transformers는 optional extra `[vector]`
 - 모든 파일 I/O는 `encoding="utf-8"` 명시 (Windows cp949 환경)
 - 단위 테스트는 API 호출·모델 다운로드 없이 통과해야 함 (LLM·임베더 monkeypatch)
 - anthropic 구조화 출력은 `client.messages.parse(..., output_format=<PydanticModel>)` → `response.parsed_output`
@@ -44,11 +45,11 @@ dependencies = [
     "pydantic>=2",
     "pyyaml",
     "numpy",
-    "sentence-transformers",
 ]
 
 [project.optional-dependencies]
 dev = ["pytest"]
+vector = ["sentence-transformers"]
 
 [project.scripts]
 horcrux = "horcrux.cli:main"
@@ -271,7 +272,7 @@ git commit -m "feat: 프로젝트 스캐폴드 + 실험 레코드 md 저장/로�
 
 **Interfaces:**
 - Consumes: 없음
-- Produces: `Config` (필드: `vault: Path`, `provider: str`, `model: str`, `embed_model: str`); `load_config() -> Config`; `generate(cfg, system: str, user: str) -> str`; `generate_parsed(cfg, system: str, user: str, schema: type[BaseModel]) -> BaseModel`
+- Produces: `Config` (필드: `vault: Path`, `provider: str`, `model: str`, `embed_provider: str`, `embed_model: str`, `search_mode: str`, `search_threshold: int`); `load_config() -> Config`; `generate(cfg, system: str, user: str) -> str`; `generate_parsed(cfg, system: str, user: str, schema: type[BaseModel]) -> BaseModel`
 
 - [ ] **Step 1: 실패하는 테스트 작성** — `tests/test_llm.py`
 
@@ -284,12 +285,16 @@ from horcrux.llm import generate, generate_parsed
 
 
 def test_load_config_defaults(monkeypatch):
-    for k in ("HORCRUX_VAULT", "HORCRUX_PROVIDER", "HORCRUX_MODEL", "HORCRUX_EMBED_MODEL"):
+    for k in ("HORCRUX_VAULT", "HORCRUX_PROVIDER", "HORCRUX_MODEL", "HORCRUX_EMBED_PROVIDER",
+              "HORCRUX_EMBED_MODEL", "HORCRUX_SEARCH", "HORCRUX_SEARCH_THRESHOLD"):
         monkeypatch.delenv(k, raising=False)
     cfg = load_config()
     assert cfg.provider == "claude"
     assert cfg.model == "claude-opus-4-8"
     assert str(cfg.vault) == "example-vault"
+    assert cfg.embed_provider == "local"
+    assert cfg.search_mode == "auto"
+    assert cfg.search_threshold == 200
 
 
 def test_load_config_env_override(monkeypatch):
@@ -332,7 +337,10 @@ class Config:
     vault: Path
     provider: str = "claude"
     model: str = "claude-opus-4-8"
+    embed_provider: str = "local"  # local | gemini | voyage
     embed_model: str = "google/embeddinggemma-300m"
+    search_mode: str = "auto"      # auto | llm | vector
+    search_threshold: int = 200
 
     def __post_init__(self):
         self.vault = Path(self.vault)
@@ -343,7 +351,10 @@ def load_config() -> Config:
         vault=Path(os.environ.get("HORCRUX_VAULT", "example-vault")),
         provider=os.environ.get("HORCRUX_PROVIDER", "claude"),
         model=os.environ.get("HORCRUX_MODEL", "claude-opus-4-8"),
+        embed_provider=os.environ.get("HORCRUX_EMBED_PROVIDER", "local"),
         embed_model=os.environ.get("HORCRUX_EMBED_MODEL", "google/embeddinggemma-300m"),
+        search_mode=os.environ.get("HORCRUX_SEARCH", "auto"),
+        search_threshold=int(os.environ.get("HORCRUX_SEARCH_THRESHOLD", "200")),
     )
 ```
 
@@ -406,20 +417,65 @@ git commit -m "feat: 설정 + 생성 LLM 어댑터 (클로드 기본, 제미니 
 
 ---
 
-### Task 3: 검색 인덱서
+### Task 3: 임베딩 어댑터 + 벡터 인덱서
 
 **Files:**
+- Create: `src/horcrux/embeddings.py`
 - Create: `src/horcrux/indexer.py`
+- Test: `tests/test_embeddings.py`
 - Test: `tests/test_indexer.py`
 
 **Interfaces:**
 - Consumes: `records.list_records/load_record/ExperimentRecord`, `config.Config`
-- Produces: `build_index(cfg) -> int` (색인된 레코드 수); `search(cfg, query: str, equipment: list[str] | None = None, materials: list[str] | None = None, symptom: str | None = None, top_k: int = 3) -> list[dict]` — 각 dict는 `{id, path, experiment_type, equipment, materials, symptom_category, score}`; `embed(cfg, texts: list[str]) -> np.ndarray` (테스트에서 monkeypatch 대상)
+- Produces: `embeddings.embed(cfg, texts: list[str]) -> np.ndarray` — `cfg.embed_provider` 분기: local(sentence-transformers 지연 임포트) 구현, gemini/voyage는 NotImplementedError; `indexer.build_index(cfg) -> int` (색인 수, `.index/model.txt`에 임베딩 모델명 기록); `indexer.search(cfg, query: str, equipment: list[str] | None = None, materials: list[str] | None = None, symptom: str | None = None, top_k: int = 3) -> list[dict]` — 각 dict는 `{id, path, experiment_type, equipment, materials, symptom_category, score}`, 인덱스의 임베딩 모델이 현재 설정과 다르면 RuntimeError("reindex 필요"). indexer는 `from .embeddings import embed`로 가져와 모듈 전역 이름으로 호출 (테스트는 `monkeypatch.setattr(indexer, "embed", fake)`)
+
+- [ ] **Step 0: 임베딩 어댑터 (테스트 + 구현)**
+
+`tests/test_embeddings.py`:
+
+```python
+import pytest
+
+from horcrux.config import Config
+from horcrux.embeddings import embed
+
+
+def test_unimplemented_provider_raises():
+    with pytest.raises(NotImplementedError):
+        embed(Config(vault="v", embed_provider="gemini"), ["x"])
+```
+
+`src/horcrux/embeddings.py`:
+
+```python
+from __future__ import annotations
+
+import numpy as np
+
+from .config import Config
+
+_model = None
+
+
+# ponytail: 생성 LLM 어댑터와 동일 패턴 — 클라우드 제공자(gemini/voyage) 추가 시 이 파일에만 elif
+def embed(cfg: Config, texts: list[str]) -> np.ndarray:
+    if cfg.embed_provider == "local":
+        global _model
+        if _model is None:
+            from sentence_transformers import SentenceTransformer  # optional extra [vector]
+            _model = SentenceTransformer(cfg.embed_model)
+        return np.asarray(_model.encode(texts, normalize_embeddings=True), dtype=np.float32)
+    raise NotImplementedError(f"embed provider '{cfg.embed_provider}' 미구현 — embeddings.py에 추가")
+```
+
+Run: `pytest tests/test_embeddings.py -v`
+Expected: 1 passed
 
 - [ ] **Step 1: 실패하는 테스트 작성** — `tests/test_indexer.py`
 
 ```python
 import numpy as np
+import pytest
 
 from horcrux import indexer
 from horcrux.config import Config
@@ -481,6 +537,13 @@ def test_search_empty_vault(tmp_path, monkeypatch):
     cfg = Config(vault=tmp_path)
     assert indexer.build_index(cfg) == 0
     assert indexer.search(cfg, "아무거나") == []
+
+
+def test_embed_model_mismatch_raises(tmp_path, monkeypatch):
+    monkeypatch.setattr(indexer, "embed", fake_embed)
+    indexer.build_index(Config(vault=make_vault(tmp_path)))
+    with pytest.raises(RuntimeError):
+        indexer.search(Config(vault=tmp_path, embed_model="다른-모델"), "스퍼터")
 ```
 
 - [ ] **Step 2: 실패 확인**
@@ -499,17 +562,8 @@ from pathlib import Path
 import numpy as np
 
 from .config import Config
+from .embeddings import embed
 from .records import ExperimentRecord, list_records, load_record
-
-_model = None
-
-
-def embed(cfg: Config, texts: list[str]) -> np.ndarray:
-    global _model
-    if _model is None:
-        from sentence_transformers import SentenceTransformer  # 지연 임포트 (테스트에서 불필요)
-        _model = SentenceTransformer(cfg.embed_model)
-    return np.asarray(_model.encode(texts, normalize_embeddings=True), dtype=np.float32)
 
 
 def index_dir(vault: Path) -> Path:
@@ -539,6 +593,7 @@ def build_index(cfg: Config) -> int:
     if texts:
         np.save(d / "embeddings.npy", embed(cfg, texts))
     (d / "meta.json").write_text(json.dumps(entries, ensure_ascii=False), encoding="utf-8")
+    (d / "model.txt").write_text(cfg.embed_model, encoding="utf-8")
     return len(entries)
 
 
@@ -552,6 +607,9 @@ def search(
     d = index_dir(cfg.vault)
     if not (d / "meta.json").exists():
         return []
+    indexed_model = (d / "model.txt").read_text(encoding="utf-8") if (d / "model.txt").exists() else cfg.embed_model
+    if indexed_model != cfg.embed_model:
+        raise RuntimeError(f"인덱스가 '{indexed_model}'로 생성됨 — 'horcrux reindex' 실행 필요")
     entries = json.loads((d / "meta.json").read_text(encoding="utf-8"))
     if not entries:
         return []
@@ -576,14 +634,171 @@ def search(
 
 - [ ] **Step 4: 통과 확인**
 
-Run: `pytest tests/test_indexer.py -v`
-Expected: 4 passed
+Run: `pytest tests/test_indexer.py tests/test_embeddings.py -v`
+Expected: 6 passed
 
 - [ ] **Step 5: 커밋**
 
 ```bash
-git add src/horcrux/indexer.py tests/test_indexer.py
-git commit -m "feat: 벡터+필터 검색 인덱서 (md 파생 캐시)"
+git add src/horcrux/embeddings.py src/horcrux/indexer.py tests/test_embeddings.py tests/test_indexer.py
+git commit -m "feat: 임베딩 어댑터 + 벡터 검색 인덱서 (vector 모드용)"
+```
+
+---
+
+### Task 3.5: 검색 디스패처 (retrieval) — LLM-select + 자동 전환
+
+**Files:**
+- Create: `src/horcrux/retrieval.py`
+- Test: `tests/test_retrieval.py`
+
+**Interfaces:**
+- Consumes: `indexer.search/build_index`, `llm.generate_parsed`, `records.list_records/load_record`, `config.Config`
+- Produces: `effective_mode(cfg) -> str` ("llm"|"vector"); `retrieve(cfg, query, equipment=None, materials=None, symptom=None, top_k=3) -> list[dict]` — indexer.search와 동일 형태(단 llm 모드는 `score=None`, 필터 인자는 llm 모드에서 무시 — 질의 원문에 이미 포함); `maybe_reindex(cfg) -> None` (vector 모드일 때만 build_index); `SelectedCases` (pydantic: `ids: list[str]`)
+
+- [ ] **Step 1: 실패하는 테스트 작성** — `tests/test_retrieval.py`
+
+```python
+from horcrux import retrieval as rt
+from horcrux.config import Config
+from horcrux.records import ExperimentRecord, Symptom, save_record
+
+
+def make_vault(tmp_path, n=2):
+    for i in range(n):
+        rec = ExperimentRecord(
+            id=f"2026-07-19_exp-{i:03d}", date="2026-07-19", experiment_type="스퍼터 증착",
+            equipment=["RF 스퍼터"], symptom=Symptom(category="low_value", description="낮음"),
+        )
+        save_record(tmp_path, rec, f"원문 {i}", f"정리 {i}")
+    return tmp_path
+
+
+def test_effective_mode_auto_threshold(tmp_path):
+    make_vault(tmp_path, 2)
+    assert rt.effective_mode(Config(vault=tmp_path, search_mode="auto", search_threshold=2)) == "llm"
+    assert rt.effective_mode(Config(vault=tmp_path, search_mode="auto", search_threshold=1)) == "vector"
+
+
+def test_effective_mode_forced(tmp_path):
+    make_vault(tmp_path, 1)
+    assert rt.effective_mode(Config(vault=tmp_path, search_mode="llm")) == "llm"
+    assert rt.effective_mode(Config(vault=tmp_path, search_mode="vector")) == "vector"
+
+
+def test_retrieve_llm_select(tmp_path, monkeypatch):
+    make_vault(tmp_path, 3)
+    captured = {}
+
+    def fake_parsed(cfg, system, user, schema):
+        captured["user"] = user
+        return rt.SelectedCases(ids=["2026-07-19_exp-001", "없는-id"])
+
+    monkeypatch.setattr(rt, "generate_parsed", fake_parsed)
+    hits = rt.retrieve(Config(vault=tmp_path, search_mode="llm"), "증착률 낮음")
+    assert [h["id"] for h in hits] == ["2026-07-19_exp-001"]  # 카탈로그에 없는 id는 무시
+    assert hits[0]["score"] is None
+    assert "2026-07-19_exp-000" in captured["user"]  # 전체 레코드가 카탈로그에 포함
+
+
+def test_retrieve_vector_dispatch(tmp_path, monkeypatch):
+    make_vault(tmp_path, 1)
+    monkeypatch.setattr(rt, "vector_search", lambda cfg, q, **kw: [{"id": "v", "score": 1.0}])
+    hits = rt.retrieve(Config(vault=tmp_path, search_mode="vector"), "질의")
+    assert hits[0]["id"] == "v"
+
+
+def test_maybe_reindex_noop_in_llm_mode(tmp_path, monkeypatch):
+    make_vault(tmp_path, 1)
+    called = {}
+    monkeypatch.setattr(rt, "build_index", lambda cfg: called.setdefault("x", True))
+    rt.maybe_reindex(Config(vault=tmp_path, search_mode="llm"))
+    assert not called
+    rt.maybe_reindex(Config(vault=tmp_path, search_mode="vector"))
+    assert called
+```
+
+- [ ] **Step 2: 실패 확인**
+
+Run: `pytest tests/test_retrieval.py -v`
+Expected: FAIL — `ModuleNotFoundError`
+
+- [ ] **Step 3: 구현** — `src/horcrux/retrieval.py`
+
+```python
+from __future__ import annotations
+
+from pydantic import BaseModel, Field
+
+from .config import Config
+from .indexer import build_index
+from .indexer import search as vector_search
+from .llm import generate_parsed
+from .records import list_records, load_record
+
+SELECT_SYSTEM = """연구실 실험 레코드 카탈로그에서 질의와 가장 유사한 사례를 고르라.
+유사 기준: 같은 장비/재료/실험 유형에서 비슷한 증상이 나타난 사례 우선.
+관련 있는 것만 최대 top_k개, 유사한 것이 없으면 빈 목록. 카탈로그에 없는 id를 지어내지 마라."""
+
+
+class SelectedCases(BaseModel):
+    ids: list[str] = Field(default_factory=list)
+
+
+def effective_mode(cfg: Config) -> str:
+    if cfg.search_mode in ("llm", "vector"):
+        return cfg.search_mode
+    # ponytail: auto = 레코드 수 기준 단순 전환 — 수백 건 넘으면 vector로
+    return "llm" if len(list_records(cfg.vault)) <= cfg.search_threshold else "vector"
+
+
+def _catalog(cfg: Config) -> tuple[str, dict[str, str]]:
+    lines, paths = [], {}
+    for path in list_records(cfg.vault):
+        rec, _ = load_record(path)
+        paths[rec.id] = str(path)
+        lines.append(
+            f"- {rec.id} | {rec.experiment_type} | 장비: {', '.join(rec.equipment) or '-'} | "
+            f"재료: {', '.join(rec.materials) or '-'} | 증상: {rec.symptom.category} {rec.symptom.description} | "
+            f"결과: {rec.results[:80]}"
+        )
+    return "\n".join(lines), paths
+
+
+def retrieve(
+    cfg: Config, query: str,
+    equipment: list[str] | None = None,
+    materials: list[str] | None = None,
+    symptom: str | None = None,
+    top_k: int = 3,
+) -> list[dict]:
+    if effective_mode(cfg) == "vector":
+        return vector_search(cfg, query, equipment=equipment, materials=materials,
+                             symptom=symptom, top_k=top_k)
+    catalog, paths = _catalog(cfg)
+    if not catalog:
+        return []
+    user = f"## 질의\n{query}\n\n## top_k\n{top_k}\n\n## 카탈로그\n{catalog}"
+    selected = generate_parsed(cfg, SELECT_SYSTEM, user, SelectedCases)
+    return [{"id": rid, "path": paths[rid], "score": None}
+            for rid in selected.ids[:top_k] if rid in paths]
+
+
+def maybe_reindex(cfg: Config) -> None:
+    if effective_mode(cfg) == "vector":
+        build_index(cfg)
+```
+
+- [ ] **Step 4: 통과 확인**
+
+Run: `pytest tests/test_retrieval.py -v`
+Expected: 5 passed
+
+- [ ] **Step 5: 커밋**
+
+```bash
+git add src/horcrux/retrieval.py tests/test_retrieval.py
+git commit -m "feat: 검색 디스패처 — LLM-select 기본, 임계값 초과 시 벡터 자동 전환"
 ```
 
 ---
@@ -595,7 +810,7 @@ git commit -m "feat: 벡터+필터 검색 인덱서 (md 파생 캐시)"
 - Test: `tests/test_ingest.py`
 
 **Interfaces:**
-- Consumes: `llm.generate_parsed`, `records.*`, `indexer.build_index`, `config.Config`
+- Consumes: `llm.generate_parsed`, `records.*`, `retrieval.maybe_reindex`, `config.Config`
 - Produces: `ParsedLog` (pydantic: ExperimentRecord의 내용 필드 + `summary: str`); `parse_log(cfg, text) -> ParsedLog` (1회 재시도 포함); `missing_required(p: ParsedLog) -> list[str]` (질문 문자열 목록, 순수 함수); `to_record(vault, p: ParsedLog, date: str) -> ExperimentRecord`; `read_multiline() -> str`; `run_log(cfg) -> Path | None` (대화형 전체 플로우)
 
 - [ ] **Step 1: 실패하는 테스트 작성** — `tests/test_ingest.py`
@@ -674,12 +889,12 @@ from pathlib import Path
 from pydantic import BaseModel, Field
 
 from .config import Config
-from .indexer import build_index
 from .llm import generate_parsed
 from .records import (
     ExperimentRecord, Parameter, SuspectedCause, Symptom,
     make_record_id, save_record,
 )
+from .retrieval import maybe_reindex
 
 PARSE_SYSTEM = """당신은 wet lab 실험 로그를 구조화하는 조수다.
 연구원이 쓴 자연어 실험 로그에서 다음을 추출하라:
@@ -779,7 +994,7 @@ def run_log(cfg: Config) -> Path | None:
         parsed = parse_log(cfg, text)
     rec = to_record(cfg.vault, parsed, today)
     path = save_record(cfg.vault, rec, text, parsed.summary)
-    build_index(cfg)
+    maybe_reindex(cfg)
     print(f"\n저장됨: {path}")
     if missing_required(parsed):
         print("(일부 필수 정보가 비어 있는 채로 저장됨)")
@@ -921,7 +1136,7 @@ git commit -m "feat: horcrux CLI 골격 (log/reindex 연결)"
 - Test: `tests/test_diagnose.py`
 
 **Interfaces:**
-- Consumes: `llm.generate/generate_parsed`, `indexer.search`, `ingest.read_multiline`, `records.read_md/slugify/Symptom`. 위키 경로는 이 모듈에서 `vault / "wiki"`로 직접 계산 (absorb는 Task 8에서 같은 규약 사용)
+- Consumes: `llm.generate/generate_parsed`, `retrieval.retrieve`, `ingest.read_multiline`, `records.read_md/slugify/Symptom`. 위키 경로는 이 모듈에서 `vault / "wiki"`로 직접 계산 (absorb는 Task 8에서 같은 규약 사용)
 - Produces: `QueryInfo` (pydantic: `experiment_type, equipment, materials, changed_variables, symptom`); `structure_query(cfg, text) -> QueryInfo`; `missing_min_info(q) -> list[str]`; `diagnose(cfg, text, q) -> str` (순수 분기: abnormal→`ESCALATION` 상수 반환, 그 외→검색+생성); `ESCALATION: str`; `run_ask(cfg)` (대화형)
 
 - [ ] **Step 1: 실패하는 테스트 작성** — `tests/test_diagnose.py`
@@ -948,7 +1163,7 @@ def test_abnormal_branch_escalates_without_llm(monkeypatch):
         raise AssertionError("abnormal 분기에서 LLM/검색을 호출하면 안 됨")
 
     monkeypatch.setattr(dg, "generate", boom)
-    monkeypatch.setattr(dg, "search", boom)
+    monkeypatch.setattr(dg, "retrieve", boom)
     q = QueryInfo(equipment=["X"], symptom=Symptom(category="abnormal", description="개형이 이상함"))
     assert diagnose(Config(vault="v"), "질문", q) == ESCALATION
 
@@ -959,7 +1174,7 @@ def test_normal_branch_uses_search_and_generate(tmp_path, monkeypatch):
     rec = ExperimentRecord(id="2026-07-19_sputter-001", date="2026-07-19",
                            equipment=["RF 스퍼터"], experiment_type="스퍼터 증착")
     path = save_record(tmp_path, rec, "원문", "정리")
-    monkeypatch.setattr(dg, "search", lambda cfg, q, **kw: [
+    monkeypatch.setattr(dg, "retrieve", lambda cfg, q, **kw: [
         {"id": rec.id, "path": str(path), "score": 0.9},
     ])
     captured = {}
@@ -976,7 +1191,7 @@ def test_normal_branch_uses_search_and_generate(tmp_path, monkeypatch):
 
 
 def test_no_cases_labelled_general(monkeypatch, tmp_path):
-    monkeypatch.setattr(dg, "search", lambda cfg, q, **kw: [])
+    monkeypatch.setattr(dg, "retrieve", lambda cfg, q, **kw: [])
     monkeypatch.setattr(dg, "generate", lambda cfg, s, u: "일반 지식 응답")
     q = QueryInfo(equipment=["X"], symptom=Symptom(category="unstable", description="불안정"))
     out = diagnose(Config(vault=tmp_path), "질문", q)
@@ -998,10 +1213,10 @@ from pathlib import Path
 from pydantic import BaseModel, Field
 
 from .config import Config
-from .indexer import search
 from .ingest import read_multiline
 from .llm import generate, generate_parsed
 from .records import Symptom, read_md, slugify
+from .retrieval import retrieve
 
 QUERY_SYSTEM = """연구원의 실험 문제 질의를 구조화하라.
 - experiment_type / equipment / materials: 질의에 언급된 것
@@ -1066,11 +1281,12 @@ def diagnose(cfg: Config, text: str, q: QueryInfo) -> str:
     if q.symptom.category == "abnormal":
         return ESCALATION
     symptom = q.symptom.category if q.symptom.category in ("low_value", "unstable") else None
-    hits = search(cfg, text, equipment=q.equipment or None,
-                  materials=q.materials or None, symptom=symptom)
+    hits = retrieve(cfg, text, equipment=q.equipment or None,
+                    materials=q.materials or None, symptom=symptom)
     case_parts = []
     for h in hits:
-        case_parts.append(f"### 사례 {h['id']} (유사도 {h['score']:.2f})\n"
+        tag = f"(유사도 {h['score']:.2f})" if h.get("score") is not None else "(LLM 선정)"
+        case_parts.append(f"### 사례 {h['id']} {tag}\n"
                           + Path(h["path"]).read_text(encoding="utf-8"))
     cases = "\n\n".join(case_parts) if case_parts else "(축적된 유사 사례 없음)"
     wiki = _wiki_context(cfg.vault, q)
@@ -1125,7 +1341,7 @@ git commit -m "feat: 문제 질의 구조화 + 증상 분기 진단 (abnormal은
 - Test: `tests/test_feedback.py`
 
 **Interfaces:**
-- Consumes: `records.update_resolution/record_path`, `indexer.build_index`
+- Consumes: `records.update_resolution/record_path`, `retrieval.maybe_reindex`
 - Produces: `run_feedback(cfg, record_id: str, resolved: bool, cause: str | None, note: str) -> None`
 
 - [ ] **Step 1: 실패하는 테스트 작성** — `tests/test_feedback.py`
@@ -1141,7 +1357,7 @@ def test_run_feedback_updates_and_reindexes(tmp_path, monkeypatch):
                            suspected_causes=[SuspectedCause(cause="타겟 산화")])
     save_record(tmp_path, rec, "원문", "정리")
     reindexed = {}
-    monkeypatch.setattr(fb, "build_index", lambda cfg: reindexed.setdefault("ok", True))
+    monkeypatch.setattr(fb, "maybe_reindex", lambda cfg: reindexed.setdefault("ok", True))
     fb.run_feedback(Config(vault=tmp_path), rec.id, True, "타겟 산화", "연마 후 해결")
     loaded, _ = load_record(record_path(tmp_path, rec.id))
     assert loaded.resolution.resolved is True
@@ -1166,8 +1382,8 @@ Expected: FAIL — `ModuleNotFoundError`
 from __future__ import annotations
 
 from .config import Config
-from .indexer import build_index
 from .records import record_path, update_resolution
+from .retrieval import maybe_reindex
 
 
 def run_feedback(cfg: Config, record_id: str, resolved: bool, cause: str | None, note: str) -> None:
@@ -1175,7 +1391,7 @@ def run_feedback(cfg: Config, record_id: str, resolved: bool, cause: str | None,
         print(f"레코드를 찾을 수 없음: {record_id}")
         return
     rec = update_resolution(cfg.vault, record_id, resolved, cause, note)
-    build_index(cfg)
+    maybe_reindex(cfg)
     state = "해결" if resolved else "미해결"
     print(f"{rec.id}: {state}로 기록됨" + (f" (원인: {cause})" if cause else ""))
 ```
@@ -1406,7 +1622,7 @@ git commit -m "feat: 위키 편찬 absorb (장비/재료/실패모드, 멱등)"
 - Test: `tests/test_seed.py`
 
 **Interfaces:**
-- Consumes: `llm.generate_parsed`, `ingest.parse_log/to_record` (모듈 별칭 `ingest_mod`로 임포트 — 테스트에서 monkeypatch 대상), `records.save_record`, `indexer.build_index`
+- Consumes: `llm.generate_parsed`, `ingest.parse_log/to_record` (모듈 별칭 `ingest_mod`로 임포트 — 테스트에서 monkeypatch 대상), `records.save_record`, `retrieval.maybe_reindex`
 - Produces: `SeedBatch` (pydantic: `logs: list[str]`); `run_seed(cfg, n: int) -> int`
 
 - [ ] **Step 1: 실패하는 테스트 작성** — `tests/test_seed.py`
@@ -1428,7 +1644,7 @@ def test_run_seed_saves_records(tmp_path, monkeypatch):
 
     monkeypatch.setattr(sd, "generate_parsed", fake_generate_parsed)
     monkeypatch.setattr(sd.ingest_mod, "generate_parsed", fake_generate_parsed)
-    monkeypatch.setattr(sd, "build_index", lambda cfg: 0)
+    monkeypatch.setattr(sd, "maybe_reindex", lambda cfg: None)
     cfg = Config(vault=tmp_path)
     n = sd.run_seed(cfg, 2)
     assert n == 2
@@ -1451,9 +1667,9 @@ from pydantic import BaseModel, Field
 
 from . import ingest as ingest_mod
 from .config import Config
-from .indexer import build_index
 from .llm import generate_parsed
 from .records import save_record
+from .retrieval import maybe_reindex
 
 SEED_SYSTEM = """wet lab 연구실의 가상 실험 로그를 만든다.
 시나리오 예: RF 스퍼터링 ITO 박막 증착, 졸겔 TiO2 합성, 전기화학 증착, 스핀코팅.
@@ -1475,7 +1691,7 @@ def run_seed(cfg: Config, n: int) -> int:
         rec = ingest_mod.to_record(cfg.vault, parsed, today)
         save_record(cfg.vault, rec, text, parsed.summary)
         saved += 1
-    build_index(cfg)
+    maybe_reindex(cfg)
     print(f"합성 로그 {saved}건 저장")
     return saved
 ```
@@ -1502,8 +1718,15 @@ set ANTHROPIC_API_KEY=...           # 또는 ant auth login
 set HORCRUX_VAULT=example-vault     # 랩 볼트 경로 (연구실 1곳 = 볼트 1개)
 ```
 
-임베딩 모델 기본값은 `google/embeddinggemma-300m` (HuggingFace 라이선스 동의 필요).
-접근이 어려우면: `set HORCRUX_EMBED_MODEL=intfloat/multilingual-e5-small`
+검색은 기본 자동 모드: 레코드 200건 이하면 LLM이 카탈로그를 읽고 유사 사례를 직접 고른다
+(임베딩 불필요). 넘어가면 벡터 검색으로 자동 전환 — 그때는:
+
+```
+pip install -e ".[vector]"    # sentence-transformers (로컬 임베딩, 기본 EmbeddingGemma)
+horcrux reindex               # 벡터 인덱스 1회 생성
+```
+
+강제 모드: `set HORCRUX_SEARCH=llm` 또는 `vector`. 임계값: `HORCRUX_SEARCH_THRESHOLD` (기본 200).
 
 ## 사용
 
@@ -1521,7 +1744,7 @@ horcrux reindex       # 검색 인덱스 재생성
 
 - [ ] **Step 6: E2E 스모크 (실제 API, 수동 1회)**
 
-Run (ANTHROPIC_API_KEY 필요, 임베딩 모델 최초 다운로드 발생):
+Run (ANTHROPIC_API_KEY 필요 — 기본 llm 검색 모드라 임베딩·모델 다운로드 없음):
 ```bash
 set HORCRUX_VAULT=example-vault
 horcrux seed -n 4
@@ -1543,6 +1766,7 @@ git commit -m "chore: 데모용 예시 볼트"
 
 ## Self-Review 결과
 
-- **스펙 커버리지**: log/ask/absorb/feedback/reindex/seed 전 명령, 재질문 루프(최대 3회), 증상 분기(abnormal→사람 연결), 원문 보존+needs_review, 멱등 absorb, LLM 어댑터 격리, 임베딩 env 교체 — 모두 태스크에 매핑됨.
-- **타입 일관성**: `ParsedLog`/`QueryInfo`는 `records.py`의 `Parameter/Symptom/SuspectedCause` 재사용. `slugify`는 Task 1 정의 → Task 6·8 소비. `read_multiline`은 Task 4 정의 → Task 6 소비. `wiki_dir` 규약(`vault/"wiki"`)은 Task 6·8 동일.
-- **알려진 한계(의도된 단순화)**: absorb는 feedback으로 갱신된 레코드를 재편찬하지 않음(`_absorb_log.json` 삭제 후 재실행으로 대체), 인덱스는 전체 재빌드 — 둘 다 코드에 ponytail 주석으로 명시.
+- **스펙 커버리지**: log/ask/absorb/feedback/reindex/seed 전 명령, 재질문 루프(최대 3회), 증상 분기(abnormal→사람 연결), 원문 보존+needs_review, 멱등 absorb, 생성 LLM·임베딩 양쪽 어댑터 격리, 검색 이중 모드(LLM-select 기본 + 임계값 초과 시 벡터 자동 전환) — 모두 태스크에 매핑됨.
+- **타입 일관성**: `ParsedLog`/`QueryInfo`는 `records.py`의 `Parameter/Symptom/SuspectedCause` 재사용. `slugify`는 Task 1 정의 → Task 6·8 소비. `read_multiline`은 Task 4 정의 → Task 6 소비. `retrieval.retrieve/maybe_reindex`는 Task 3.5 정의 → Task 4·6·7·9 소비 (retrieve 반환 형태는 indexer.search와 동일, llm 모드는 score=None). `wiki_dir` 규약(`vault/"wiki"`)은 Task 6·8 동일.
+- **임포트 사이클 없음**: retrieval → {indexer, llm, records}; ingest/diagnose/feedback/seed → retrieval. indexer → embeddings (sentence-transformers는 local 분기 안에서 지연 임포트라 llm 모드에선 로드 안 됨).
+- **알려진 한계(의도된 단순화)**: absorb는 feedback으로 갱신된 레코드를 재편찬하지 않음(`_absorb_log.json` 삭제 후 재실행으로 대체), 인덱스는 전체 재빌드, llm 모드에서 필터 인자 무시(질의 원문으로 충분) — 코드에 ponytail 주석으로 명시.

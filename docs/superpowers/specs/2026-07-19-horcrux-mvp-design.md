@@ -71,7 +71,7 @@ needs_review: false                 # 파싱 실패 시 true
 | `horcrux ask` | 문제 질의 → 질의 구조화 + 최소 정보 되묻기 → 증상 분기: ①값낮음/②불안정 → 유사사례 검색 + 응답(사례 인용·원인 후보·확인 방법), ③비정상 → 설계 결함 의심으로 사람 연결 안내 |
 | `horcrux absorb` | 신규 레코드를 장비/재료/실패모드 아티클로 편찬. `_absorb_log.json`으로 멱등 |
 | `horcrux feedback <id>` | 해결 여부·실제 원인 기록 → resolution/suspected_causes 갱신 → 재인덱싱 |
-| `horcrux reindex` | 인덱스 전체 재생성 |
+| `horcrux reindex` | 벡터 인덱스 전체 재생성 (vector 모드 전환 시 1회 실행) |
 | `horcrux seed` | 합성 wet lab 로그 생성(개발/데모용) |
 
 필수 필드 (ingest): objective, equipment ≥1, parameters ≥1, results.
@@ -81,14 +81,26 @@ needs_review: false                 # 파싱 실패 시 true
 
 - **생성 LLM**: 어댑터(`llm.py`)로 격리. 기본 클로드(`claude-opus-4-8`, anthropic SDK,
   structured output은 `messages.parse` + pydantic). 추후 제미니 교체 시 이 파일만 수정.
-- **임베딩**: 로컬 sentence-transformers. 기본 `google/embeddinggemma-300m`(최종 온프레미스
-  비전과 동일 스택). 성능 저하 시 설정 한 줄로 교체 (예: `intfloat/multilingual-e5-small`).
-- 설정은 환경변수: `HORCRUX_VAULT`, `HORCRUX_PROVIDER`, `HORCRUX_MODEL`, `HORCRUX_EMBED_MODEL`.
+- **임베딩**: 생성 LLM과 동일하게 어댑터(`embeddings.py`)로 격리. `HORCRUX_EMBED_PROVIDER`로
+  분기 — `local`(sentence-transformers, 기본 `google/embeddinggemma-300m`, 실데이터 단계용) 구현,
+  `gemini`/`voyage`는 NotImplementedError 자리만. MVP 기본 검색은 임베딩을 아예 쓰지 않음(아래 참조).
+  sentence-transformers는 optional extra(`pip install -e ".[vector]"`)로 분리.
+- 설정 환경변수: `HORCRUX_VAULT`, `HORCRUX_PROVIDER`, `HORCRUX_MODEL`,
+  `HORCRUX_EMBED_PROVIDER`, `HORCRUX_EMBED_MODEL`, `HORCRUX_SEARCH`, `HORCRUX_SEARCH_THRESHOLD`.
 
-## 검색
+## 검색 (이중 모드, 자동 전환)
 
-frontmatter 필터(장비·재료·증상 카테고리 겹침) → 부분집합 내 코사인 유사도 랭킹 →
-부분집합이 비면 전체에서 랭킹. top-k 원본 레코드 + 관련 위키 아티클을 응답 생성 컨텍스트로.
+diagnose는 `retrieval.retrieve()`만 호출한다. 모드는 `HORCRUX_SEARCH`(auto|llm|vector, 기본 auto):
+auto는 레코드 수 ≤ `HORCRUX_SEARCH_THRESHOLD`(기본 200)이면 llm, 초과면 vector.
+
+- **llm_select (MVP 기본)**: 전체 레코드의 frontmatter 요약 카탈로그(id·유형·장비·재료·증상·결과)를
+  생성 LLM에 주고 유사 사례 top-k id를 고르게 함(structured output). 임베딩·인덱스 불필요,
+  API 키 하나로 동작. 수십~수백 건 규모에선 맥락을 읽는 LLM 선택이 더 정확하기도 함.
+- **vector (수백 건 초과 시 자동 전환)**: frontmatter 필터(장비·재료·증상 겹침) → 부분집합 내
+  코사인 유사도 랭킹 → 비면 전체 랭킹. `.index/`는 vector 모드에서만 생성·갱신.
+  인덱스에 임베딩 모델명을 기록해 불일치 시 에러로 reindex를 안내.
+
+두 모드 모두 top-k 원본 레코드 + 관련 위키 아티클을 응답 생성 컨텍스트로 사용.
 
 ## 에러 처리
 
@@ -99,11 +111,12 @@ frontmatter 필터(장비·재료·증상 카테고리 겹침) → 부분집합 
 
 ## 테스트
 
-- 단위: 레코드 md 라운드트립, 인덱서(가짜 임베더), 재질문 판정 로직, 증상 분기,
-  absorb 멱등성 — 전부 LLM 모킹, API 호출 없음.
+- 단위: 레코드 md 라운드트립, 인덱서(가짜 임베더), 검색 디스패처(모드 자동 전환·LLM-select),
+  재질문 판정 로직, 증상 분기, absorb 멱등성 — 전부 LLM 모킹, API 호출 없음.
 - 통합: 실제 API로 log→ask 흐름 수동 스모크 1회 (합성 데이터).
 
 ## 제외 (YAGNI)
 
 웹 UI, 인증/다중 사용자, 자동 스케줄링, 온프레미스 생성 LLM(어댑터로 대비만),
+클라우드 임베딩 제공자 구현(gemini/voyage — 어댑터 자리만, 전환 시점에 구현),
 학습 루프의 모델 재학습(피드백은 DB 갱신까지만), 실데이터 마이그레이션 도구(실데이터 확보 후).
