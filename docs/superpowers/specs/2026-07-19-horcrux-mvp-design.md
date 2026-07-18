@@ -25,6 +25,7 @@ MVP 범위: **코어 파이프라인 + 저장 + 위키 편찬(absorb)**. CLI 대
 
 ```
 <lab-vault>/
+  config.yaml                       # 연구실별 하드 게이트 설정 (§2a)
   raw/experiments/                  # 실험 1건 = md 1개
     2026-07-19_sputter-dep-001.md
   wiki/
@@ -74,8 +75,38 @@ needs_review: false                 # 파싱 실패 시 true
 | `horcrux reindex` | 벡터 인덱스 전체 재생성 (vector 모드 전환 시 1회 실행) |
 | `horcrux seed` | 합성 wet lab 로그 생성(개발/데모용) |
 
-필수 필드 (ingest): objective, equipment ≥1, parameters ≥1, results.
 최소 정보 (ask): 증상 설명 + (장비 또는 실험 유형).
+
+## §2a 재질문 하드 게이트 — 볼트 설정 파일
+
+하드 게이트 목록은 코드 상수가 아니라 볼트의 `config.yaml`에 둔다 ("연구실 1곳 = 볼트 1개"
+이므로 설정도 볼트에 있는 것이 자연스럽다).
+
+```yaml
+# <lab-vault>/config.yaml
+required_fields:            # 구조 카테고리 하드 게이트 (기본값 = 5개 전부)
+  [objective, parameters, results, symptom, actions_taken]
+required_parameters:        # 연구실 커스텀 — 이 파라미터는 반드시 기록돼야 함
+  - 기판 온도
+  - 챔버 습도
+```
+
+- `required_fields`: 5개 구조 카테고리(objective/parameters/results/symptom/actions_taken) 중
+  어떤 것을 하드 게이트로 켤지 사용자가 선택. 파일이 없으면 기본값 5개 전부.
+- `required_parameters`: 연구실 특화 필수 항목 ("우리 랩은 습도 무조건 기록" 같은 규칙).
+
+**의미 매칭은 LLM, 게이트 판단은 코드**: `required_parameters`는 자유 텍스트라 이름 매칭이
+문제가 된다 (연구원이 "챔버 습도" 대신 "습도 40%"라고 쓸 수 있음). 파싱 프롬프트에 이 목록을
+넘겨 LLM이 항목별 기재/미기재를 판단해 미기재 목록으로 보고하고, 재질문 루프 제어(계속 물을지)는
+그 보고를 받아 코드가 결정론적으로 한다. 코드는 LLM이 보고한 이름을 설정 목록과 대조해
+목록 밖 항목(환각)은 무시한다.
+
+구조 카테고리의 채움 판정은 결정론적: objective/results는 비어있지 않음, parameters는 1개 이상,
+symptom은 category≠none 또는 설명 있음(문제 없으면 LLM이 "문제 없음"으로 명시 기록),
+actions_taken은 조치 있음 또는 문제 자체가 없음(category=none).
+
+**v2 연결**: 온보딩(수준 2)이 하는 일은 이 config.yaml을 LLM이 만들어주는 것. MVP에서는
+사용자가 직접 편집한다 — 두 수준이 같은 파일로 이어진다.
 
 ## LLM / 임베딩
 

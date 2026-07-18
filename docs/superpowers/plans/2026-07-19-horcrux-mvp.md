@@ -13,6 +13,7 @@
 - 생성 모델 기본값: `claude-opus-4-8` (환경변수 `HORCRUX_MODEL`로 교체)
 - 검색 모드: `HORCRUX_SEARCH` = auto|llm|vector (기본 auto — 레코드 수 ≤ `HORCRUX_SEARCH_THRESHOLD`(기본 200)이면 LLM-select, 초과면 vector). diagnose는 `retrieval.retrieve()`만 호출
 - 임베딩: 어댑터(`embeddings.py`). `HORCRUX_EMBED_PROVIDER` = local|gemini|voyage (기본 local — sentence-transformers, gemini/voyage는 NotImplementedError 자리만). `HORCRUX_EMBED_MODEL` 기본 `google/embeddinggemma-300m` (HF 게이트 접근 불가 시 env로 `intfloat/multilingual-e5-small` 폴백). sentence-transformers는 optional extra `[vector]`
+- 하드 게이트(§2a): 볼트 `config.yaml`의 `required_fields`(5개 구조 카테고리 중 선택, 기본 전부)와 `required_parameters`(연구실 커스텀 필수 파라미터). 의미 매칭은 LLM(파싱 시 미기재 보고), 게이트 판단은 코드(보고를 설정 목록과 대조, 목록 밖 이름은 무시)
 - 모든 파일 I/O는 `encoding="utf-8"` 명시 (Windows cp949 환경)
 - 단위 테스트는 API 호출·모델 다운로드 없이 통과해야 함 (LLM·임베더 monkeypatch)
 - anthropic 구조화 출력은 `client.messages.parse(..., output_format=<PydanticModel>)` → `response.parsed_output`
@@ -272,7 +273,7 @@ git commit -m "feat: 프로젝트 스캐폴드 + 실험 레코드 md 저장/로�
 
 **Interfaces:**
 - Consumes: 없음
-- Produces: `Config` (필드: `vault: Path`, `provider: str`, `model: str`, `embed_provider: str`, `embed_model: str`, `search_mode: str`, `search_threshold: int`); `load_config() -> Config`; `generate(cfg, system: str, user: str) -> str`; `generate_parsed(cfg, system: str, user: str, schema: type[BaseModel]) -> BaseModel`
+- Produces: `Config` (필드: `vault: Path`, `provider: str`, `model: str`, `embed_provider: str`, `embed_model: str`, `search_mode: str`, `search_threshold: int`); `load_config() -> Config`; `GATEABLE_FIELDS: list[str]` (5개 구조 카테고리); `VaultConfig` (필드: `required_fields: list[str]`, `required_parameters: list[str]`); `load_vault_config(vault: Path) -> VaultConfig` (볼트 `config.yaml` 로드, 없으면 기본값 = 5개 전부·커스텀 없음); `generate(cfg, system: str, user: str) -> str`; `generate_parsed(cfg, system: str, user: str, schema: type[BaseModel]) -> BaseModel`
 
 - [ ] **Step 1: 실패하는 테스트 작성** — `tests/test_llm.py`
 
@@ -280,7 +281,7 @@ git commit -m "feat: 프로젝트 스캐폴드 + 실험 레코드 md 저장/로�
 import pytest
 from pydantic import BaseModel
 
-from horcrux.config import Config, load_config
+from horcrux.config import GATEABLE_FIELDS, Config, load_config, load_vault_config
 from horcrux.llm import generate, generate_parsed
 
 
@@ -303,6 +304,22 @@ def test_load_config_env_override(monkeypatch):
     cfg = load_config()
     assert str(cfg.vault) == "my-lab"
     assert cfg.provider == "gemini"
+
+
+def test_vault_config_defaults(tmp_path):
+    vc = load_vault_config(tmp_path)
+    assert vc.required_fields == GATEABLE_FIELDS
+    assert vc.required_parameters == []
+
+
+def test_vault_config_from_yaml(tmp_path):
+    (tmp_path / "config.yaml").write_text(
+        "required_fields: [objective, results]\nrequired_parameters:\n  - 챔버 습도\n",
+        encoding="utf-8",
+    )
+    vc = load_vault_config(tmp_path)
+    assert vc.required_fields == ["objective", "results"]
+    assert vc.required_parameters == ["챔버 습도"]
 
 
 def test_unknown_provider_raises():
@@ -356,6 +373,28 @@ def load_config() -> Config:
         search_mode=os.environ.get("HORCRUX_SEARCH", "auto"),
         search_threshold=int(os.environ.get("HORCRUX_SEARCH_THRESHOLD", "200")),
     )
+
+
+# §2a — 구조 카테고리 하드 게이트 후보 (볼트 config.yaml의 required_fields가 이 중에서 선택)
+GATEABLE_FIELDS = ["objective", "parameters", "results", "symptom", "actions_taken"]
+
+
+@dataclass
+class VaultConfig:
+    required_fields: list[str]
+    required_parameters: list[str]
+
+
+def load_vault_config(vault: Path) -> VaultConfig:
+    p = Path(vault) / "config.yaml"
+    data = {}
+    if p.exists():
+        import yaml
+        data = yaml.safe_load(p.read_text(encoding="utf-8")) or {}
+    return VaultConfig(
+        required_fields=list(data.get("required_fields", GATEABLE_FIELDS)),
+        required_parameters=list(data.get("required_parameters", [])),
+    )
 ```
 
 - [ ] **Step 4: 구현** — `src/horcrux/llm.py`
@@ -406,7 +445,7 @@ def generate_parsed(cfg: Config, system: str, user: str, schema: type[BaseModel]
 - [ ] **Step 5: 통과 확인**
 
 Run: `pytest tests/test_llm.py -v`
-Expected: 3 passed
+Expected: 5 passed
 
 - [ ] **Step 6: 커밋**
 
@@ -810,8 +849,8 @@ git commit -m "feat: 검색 디스패처 — LLM-select 기본, 임계값 초과
 - Test: `tests/test_ingest.py`
 
 **Interfaces:**
-- Consumes: `llm.generate_parsed`, `records.*`, `retrieval.maybe_reindex`, `config.Config`
-- Produces: `ParsedLog` (pydantic: ExperimentRecord의 내용 필드 + `summary: str`); `parse_log(cfg, text) -> ParsedLog` (1회 재시도 포함); `missing_required(p: ParsedLog) -> list[str]` (질문 문자열 목록, 순수 함수); `to_record(vault, p: ParsedLog, date: str) -> ExperimentRecord`; `read_multiline() -> str`; `run_log(cfg) -> Path | None` (대화형 전체 플로우)
+- Consumes: `llm.generate_parsed`, `records.*`, `retrieval.maybe_reindex`, `config.Config/VaultConfig/load_vault_config`
+- Produces: `ParsedLog` (pydantic: ExperimentRecord의 내용 필드 + `summary: str` + `unrecorded_required_parameters: list[str]`); `parse_log(cfg, text, vcfg: VaultConfig | None = None) -> ParsedLog` (1회 재시도 + LLM 미기재 보고를 설정 목록과 대조해 환각 이름 제거); `missing_required(p: ParsedLog, vcfg: VaultConfig) -> list[str]` (§2a 게이트 판정 — 순수 함수, 질문 문자열 목록); `FIELD_QUESTIONS: dict[str, str]`; `to_record(vault, p: ParsedLog, date: str) -> ExperimentRecord`; `read_multiline() -> str`; `run_log(cfg) -> Path | None` (대화형 전체 플로우)
 
 - [ ] **Step 1: 실패하는 테스트 작성** — `tests/test_ingest.py`
 
@@ -819,9 +858,15 @@ git commit -m "feat: 검색 디스패처 — LLM-select 기본, 임계값 초과
 import pytest
 
 from horcrux import ingest
-from horcrux.config import Config
+from horcrux.config import Config, VaultConfig
 from horcrux.ingest import ParsedLog, missing_required, parse_log, to_record
-from horcrux.records import Parameter
+from horcrux.records import Parameter, Symptom
+
+
+DEFAULT_VC = VaultConfig(
+    required_fields=["objective", "parameters", "results", "symptom", "actions_taken"],
+    required_parameters=[],
+)
 
 
 def full_parsed():
@@ -829,16 +874,61 @@ def full_parsed():
         experiment_type="박막 증착", objective="ITO 증착",
         equipment=["RF 스퍼터"], parameters=[Parameter(name="RF power", value="150W")],
         results="증착률 5nm/min", summary="정리 서술",
+        symptom=Symptom(category="none", description="문제 없음"),
     )
 
 
 def test_missing_required_empty_log():
-    gaps = missing_required(ParsedLog())
-    assert len(gaps) == 4  # 목적, 장비, 공정변수, 결과
+    gaps = missing_required(ParsedLog(), DEFAULT_VC)
+    assert len(gaps) == 4  # 목적·공정변수·결과·증상. 조치는 문제없음(category=none)이라 통과
 
 
 def test_missing_required_full_log():
-    assert missing_required(full_parsed()) == []
+    assert missing_required(full_parsed(), DEFAULT_VC) == []
+
+
+def test_missing_required_respects_field_toggle():
+    vc = VaultConfig(required_fields=["objective"], required_parameters=[])
+    assert len(missing_required(ParsedLog(), vc)) == 1
+
+
+def test_missing_required_actions_gate_when_problem():
+    p = full_parsed()
+    p.symptom = Symptom(category="low_value", description="증착률 낮음")
+    p.actions_taken = []
+    assert len(missing_required(p, DEFAULT_VC)) == 1  # 문제가 있는데 조치 미기재
+
+
+def test_missing_required_lab_parameters():
+    p = full_parsed()
+    p.unrecorded_required_parameters = ["챔버 습도"]
+    vc = VaultConfig(required_fields=[], required_parameters=["챔버 습도"])
+    assert missing_required(p, vc) == ["연구실 필수 항목 '챔버 습도' 값을 알려주세요."]
+
+
+def test_parse_log_passes_required_parameters_to_llm(monkeypatch):
+    captured = {}
+
+    def fake(cfg, system, user, schema):
+        captured["user"] = user
+        return full_parsed()
+
+    monkeypatch.setattr(ingest, "generate_parsed", fake)
+    vc = VaultConfig(required_fields=[], required_parameters=["기판 온도"])
+    parse_log(Config(vault="v"), "로그", vc)
+    assert "기판 온도" in captured["user"]
+
+
+def test_parse_log_filters_hallucinated_parameters(monkeypatch):
+    def fake(cfg, system, user, schema):
+        p = full_parsed()
+        p.unrecorded_required_parameters = ["챔버 습도", "엉뚱한 항목"]
+        return p
+
+    monkeypatch.setattr(ingest, "generate_parsed", fake)
+    vc = VaultConfig(required_fields=[], required_parameters=["챔버 습도"])
+    result = parse_log(Config(vault="v"), "로그", vc)
+    assert result.unrecorded_required_parameters == ["챔버 습도"]
 
 
 def test_parse_log_retries_once(monkeypatch):
@@ -888,7 +978,7 @@ from pathlib import Path
 
 from pydantic import BaseModel, Field
 
-from .config import Config
+from .config import Config, VaultConfig, load_vault_config
 from .llm import generate_parsed
 from .records import (
     ExperimentRecord, Parameter, SuspectedCause, Symptom,
@@ -907,6 +997,10 @@ PARSE_SYSTEM = """당신은 wet lab 실험 로그를 구조화하는 조수다.
 - suspected_causes: 로그에 언급된 추측 원인 (전부 status=unconfirmed)
 - actions_taken: 취한 조치
 - summary: 로그를 2~4문장으로 정리한 서술
+- unrecorded_required_parameters: 사용자 메시지에 [연구실 필수 파라미터 목록]이 있으면, 각 항목이
+  로그에 기재됐는지 판단해 미기재 항목명만 목록의 표기 그대로 나열하라. 표현이 달라도 의미가 같으면
+  기재된 것으로 본다 (예: 목록의 "챔버 습도" ↔ 로그의 "습도 40%"). 목록이 없으면 빈 목록.
+문제가 없었다고 명시된 로그는 symptom을 category=none, description="문제 없음"으로 기록하라.
 로그에 없는 내용을 지어내지 마라. 없는 필드는 비워 두라."""
 
 
@@ -921,25 +1015,45 @@ class ParsedLog(BaseModel):
     suspected_causes: list[SuspectedCause] = Field(default_factory=list)
     actions_taken: list[str] = Field(default_factory=list)
     summary: str = ""
+    unrecorded_required_parameters: list[str] = Field(default_factory=list)
 
 
-def parse_log(cfg: Config, text: str) -> ParsedLog:
+def parse_log(cfg: Config, text: str, vcfg: VaultConfig | None = None) -> ParsedLog:
+    vcfg = vcfg or load_vault_config(cfg.vault)
+    user = text
+    if vcfg.required_parameters:
+        req = "\n".join(f"- {n}" for n in vcfg.required_parameters)
+        user = f"{text}\n\n[연구실 필수 파라미터 목록]\n{req}"
     try:
-        return generate_parsed(cfg, PARSE_SYSTEM, text, ParsedLog)
+        p = generate_parsed(cfg, PARSE_SYSTEM, user, ParsedLog)
     except Exception:
-        return generate_parsed(cfg, PARSE_SYSTEM, text, ParsedLog)  # 1회 재시도
+        p = generate_parsed(cfg, PARSE_SYSTEM, user, ParsedLog)  # 1회 재시도
+    # §2a — 의미 매칭은 LLM, 게이트 판단은 코드: 보고를 설정 목록과 대조, 목록 밖 이름(환각)은 무시
+    p.unrecorded_required_parameters = [
+        n for n in p.unrecorded_required_parameters if n in vcfg.required_parameters
+    ]
+    return p
 
 
-def missing_required(p: ParsedLog) -> list[str]:
-    gaps = []
-    if not p.objective.strip():
-        gaps.append("실험 목적이 무엇인가요?")
-    if not p.equipment:
-        gaps.append("어떤 장비를 사용했나요?")
-    if not p.parameters:
-        gaps.append("설정한 공정변수(값 포함)는 무엇인가요? 이번에 변경한 변수가 있다면 함께 알려주세요.")
-    if not p.results.strip():
-        gaps.append("실험 결과는 어땠나요?")
+FIELD_QUESTIONS = {
+    "objective": "실험 목적이 무엇인가요?",
+    "parameters": "설정한 공정변수(값 포함)는 무엇인가요? 이번에 변경한 변수가 있다면 함께 알려주세요.",
+    "results": "실험 결과는 어땠나요?",
+    "symptom": "문제나 이상 증상이 있었나요? 없었다면 '문제 없음'이라고 알려주세요.",
+    "actions_taken": "문제에 대해 어떤 조치를 취했나요?",
+}
+
+
+def missing_required(p: ParsedLog, vcfg: VaultConfig) -> list[str]:
+    filled = {
+        "objective": bool(p.objective.strip()),
+        "parameters": bool(p.parameters),
+        "results": bool(p.results.strip()),
+        "symptom": p.symptom.category != "none" or bool(p.symptom.description.strip()),
+        "actions_taken": bool(p.actions_taken) or p.symptom.category == "none",
+    }
+    gaps = [FIELD_QUESTIONS[f] for f in vcfg.required_fields if f in filled and not filled[f]]
+    gaps += [f"연구실 필수 항목 '{n}' 값을 알려주세요." for n in p.unrecorded_required_parameters]
     return gaps
 
 
@@ -972,8 +1086,9 @@ def run_log(cfg: Config) -> Path | None:
         print("입력이 없습니다.")
         return None
     today = _date.today().isoformat()
+    vcfg = load_vault_config(cfg.vault)
     try:
-        parsed = parse_log(cfg, text)
+        parsed = parse_log(cfg, text, vcfg)
     except Exception as e:
         # 파싱 실패해도 원문은 보존
         rec = ExperimentRecord(id=make_record_id(cfg.vault, today, "exp"), date=today, needs_review=True)
@@ -981,7 +1096,7 @@ def run_log(cfg: Config) -> Path | None:
         print(f"파싱에 실패해 원문만 저장했습니다 (needs_review): {path}")
         return path
     for _ in range(3):
-        gaps = missing_required(parsed)
+        gaps = missing_required(parsed, vcfg)
         if not gaps:
             break
         print("\n기록 품질을 위해 추가로 알려주세요 (건너뛰려면 빈 줄 2번):")
@@ -991,12 +1106,12 @@ def run_log(cfg: Config) -> Path | None:
         if not extra:
             break
         text = f"{text}\n\n[추가 답변]\n{extra}"
-        parsed = parse_log(cfg, text)
+        parsed = parse_log(cfg, text, vcfg)
     rec = to_record(cfg.vault, parsed, today)
     path = save_record(cfg.vault, rec, text, parsed.summary)
     maybe_reindex(cfg)
     print(f"\n저장됨: {path}")
-    if missing_required(parsed):
+    if missing_required(parsed, vcfg):
         print("(일부 필수 정보가 비어 있는 채로 저장됨)")
     return path
 ```
@@ -1004,7 +1119,7 @@ def run_log(cfg: Config) -> Path | None:
 - [ ] **Step 4: 통과 확인**
 
 Run: `pytest tests/test_ingest.py -v`
-Expected: 5 passed
+Expected: 10 passed
 
 - [ ] **Step 5: 커밋**
 
@@ -1739,6 +1854,17 @@ horcrux feedback <id> --resolved y --cause "타겟 산화"   # 결과 피드백
 horcrux reindex       # 검색 인덱스 재생성
 ```
 
+## 연구실 설정 (§2a)
+
+볼트에 `config.yaml`을 두면 기록 시 하드 게이트가 적용된다 (없으면 5개 카테고리 전부 기본):
+
+```
+required_fields: [objective, parameters, results, symptom, actions_taken]
+required_parameters:
+  - 기판 온도
+  - 챔버 습도
+```
+
 설계 문서: `docs/superpowers/specs/2026-07-19-horcrux-mvp-design.md`
 ````
 
@@ -1766,7 +1892,7 @@ git commit -m "chore: 데모용 예시 볼트"
 
 ## Self-Review 결과
 
-- **스펙 커버리지**: log/ask/absorb/feedback/reindex/seed 전 명령, 재질문 루프(최대 3회), 증상 분기(abnormal→사람 연결), 원문 보존+needs_review, 멱등 absorb, 생성 LLM·임베딩 양쪽 어댑터 격리, 검색 이중 모드(LLM-select 기본 + 임계값 초과 시 벡터 자동 전환) — 모두 태스크에 매핑됨.
+- **스펙 커버리지**: log/ask/absorb/feedback/reindex/seed 전 명령, 재질문 루프(최대 3회, §2a 볼트 config.yaml 하드 게이트 — required_fields 토글 + required_parameters 커스텀, 의미 매칭 LLM/게이트 판단 코드), 증상 분기(abnormal→사람 연결), 원문 보존+needs_review, 멱등 absorb, 생성 LLM·임베딩 양쪽 어댑터 격리, 검색 이중 모드(LLM-select 기본 + 임계값 초과 시 벡터 자동 전환) — 모두 태스크에 매핑됨.
 - **타입 일관성**: `ParsedLog`/`QueryInfo`는 `records.py`의 `Parameter/Symptom/SuspectedCause` 재사용. `slugify`는 Task 1 정의 → Task 6·8 소비. `read_multiline`은 Task 4 정의 → Task 6 소비. `retrieval.retrieve/maybe_reindex`는 Task 3.5 정의 → Task 4·6·7·9 소비 (retrieve 반환 형태는 indexer.search와 동일, llm 모드는 score=None). `wiki_dir` 규약(`vault/"wiki"`)은 Task 6·8 동일.
 - **임포트 사이클 없음**: retrieval → {indexer, llm, records}; ingest/diagnose/feedback/seed → retrieval. indexer → embeddings (sentence-transformers는 local 분기 안에서 지연 임포트라 llm 모드에선 로드 안 됨).
 - **알려진 한계(의도된 단순화)**: absorb는 feedback으로 갱신된 레코드를 재편찬하지 않음(`_absorb_log.json` 삭제 후 재실행으로 대체), 인덱스는 전체 재빌드, llm 모드에서 필터 인자 무시(질의 원문으로 충분) — 코드에 ponytail 주석으로 명시.
