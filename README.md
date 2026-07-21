@@ -8,12 +8,16 @@
 
 ```
 pip install -e .
-set ANTHROPIC_API_KEY=...           # 또는 ant auth login
 set HORCRUX_VAULT=example-vault     # 랩 볼트 경로 (연구실 1곳 = 볼트 1개)
+set HORCRUX_PROVIDER=claude         # claude | gemini | codex (기본 claude)
+set HORCRUX_MODEL=...               # 생략 시 CLI 기본 모델
 ```
 
+LLM 호출은 API 키 대신 로컬 CLI(subprocess)를 쓴다 — 셋 중 하나가 설치·로그인돼
+있으면 된다: `claude`(Claude Code), `gemini`(Gemini CLI), `codex`(Codex CLI).
+
 검색은 LLM-select: LLM이 레코드·위키 카탈로그를 읽고 유사 사례를 직접 고른다.
-임베딩·벡터 인덱스 없이 API 키 하나로 동작한다.
+임베딩·벡터 인덱스 없이 CLI 로그인만으로 동작한다.
 
 ## 사용
 

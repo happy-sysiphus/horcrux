@@ -9,7 +9,7 @@ from pathlib import Path
 class Config:
     vault: Path
     provider: str = "claude"
-    model: str = "claude-opus-4-8"
+    model: str | None = None  # None = 각 CLI의 기본 모델 사용
 
     def __post_init__(self):
         self.vault = Path(self.vault)
@@ -19,7 +19,7 @@ def load_config() -> Config:
     return Config(
         vault=Path(os.environ.get("HORCRUX_VAULT", "example-vault")),
         provider=os.environ.get("HORCRUX_PROVIDER", "claude"),
-        model=os.environ.get("HORCRUX_MODEL", "claude-opus-4-8"),
+        model=os.environ.get("HORCRUX_MODEL") or None,
     )
 
 

@@ -1,8 +1,11 @@
+import subprocess
+
 import pytest
 from pydantic import BaseModel
 
+from horcrux import llm
 from horcrux.config import GATEABLE_FIELDS, Config, load_config, load_vault_config
-from horcrux.llm import generate, generate_parsed
+from horcrux.llm import _extract_json, generate, generate_parsed
 
 
 def test_load_config_defaults(monkeypatch):
@@ -10,16 +13,18 @@ def test_load_config_defaults(monkeypatch):
         monkeypatch.delenv(k, raising=False)
     cfg = load_config()
     assert cfg.provider == "claude"
-    assert cfg.model == "claude-opus-4-8"
+    assert cfg.model is None
     assert str(cfg.vault) == "example-vault"
 
 
 def test_load_config_env_override(monkeypatch):
     monkeypatch.setenv("HORCRUX_VAULT", "my-lab")
     monkeypatch.setenv("HORCRUX_PROVIDER", "gemini")
+    monkeypatch.setenv("HORCRUX_MODEL", "gemini-2.5-pro")
     cfg = load_config()
     assert str(cfg.vault) == "my-lab"
     assert cfg.provider == "gemini"
+    assert cfg.model == "gemini-2.5-pro"
 
 
 def test_vault_config_defaults(tmp_path):
@@ -46,13 +51,147 @@ def test_vault_config_null_keys(tmp_path):
     assert vc.required_parameters == []
 
 
-def test_unknown_provider_raises():
-    cfg = Config(vault="v", provider="gemini")
+# --- CLI 어댑터: 프로바이더별 커맨드 구성 (_run 모킹) ---
 
-    class Out(BaseModel):
-        x: int = 0
+class FakeRunFn:
+    def __init__(self, out="응답"):
+        self.calls = []
+        self.out = out
 
+    def __call__(self, cmd, prompt):
+        self.calls.append((cmd, prompt))
+        return self.out if isinstance(self.out, str) else self.out(cmd)
+
+
+@pytest.fixture
+def fake_run(monkeypatch):
+    fr = FakeRunFn()
+    monkeypatch.setattr(llm, "_run", fr)
+    monkeypatch.setattr(llm.shutil, "which", lambda name: f"/bin/{name}")
+    return fr
+
+
+def test_generate_claude_command(fake_run):
+    out = generate(Config(vault="v", provider="claude", model="opus"), "시스템", "유저")
+    assert out == "응답"
+    cmd, prompt = fake_run.calls[0]
+    assert cmd == ["/bin/claude", "-p", "--model", "opus"]
+    assert prompt == "시스템\n\n유저"
+
+
+def test_generate_no_model_omits_flag(fake_run):
+    generate(Config(vault="v", provider="claude"), "s", "u")
+    assert "--model" not in fake_run.calls[0][0]
+
+
+def test_generate_gemini_command(fake_run):
+    generate(Config(vault="v", provider="gemini"), "s", "u")
+    cmd, prompt = fake_run.calls[0]
+    assert cmd == ["/bin/gemini"]
+    assert prompt == "s\n\nu"
+
+
+def test_generate_codex_command_and_last_message_file(fake_run):
+    def write_and_return(cmd):
+        out_path = cmd[cmd.index("-o") + 1]
+        with open(out_path, "w", encoding="utf-8") as f:
+            f.write("최종 메시지")
+        return "진행 로그"
+
+    fake_run.out = write_and_return
+    out = generate(Config(vault="v", provider="codex"), "s", "u")
+    assert out == "최종 메시지"  # stdout(진행 로그) 아닌 -o 파일이 정본
+    cmd, _ = fake_run.calls[0]
+    out_path = cmd[cmd.index("-o") + 1]
+    assert cmd == ["/bin/codex", "exec", "-", "--skip-git-repo-check", "--ephemeral",
+                   "--sandbox", "read-only", "-o", out_path]
+
+
+def test_generate_missing_cli_raises(monkeypatch):
+    monkeypatch.setattr(llm.shutil, "which", lambda name: None)
+    with pytest.raises(RuntimeError, match="찾을 수 없음"):
+        generate(Config(vault="v", provider="gemini"), "s", "u")
+
+
+def test_unknown_provider_raises(fake_run):
     with pytest.raises(NotImplementedError):
-        generate(cfg, "s", "u")
-    with pytest.raises(NotImplementedError):
-        generate_parsed(cfg, "s", "u", Out)
+        generate(Config(vault="v", provider="hal9000"), "s", "u")
+
+
+# --- _run 내부: 종료 코드·타임아웃 (Popen 모킹) ---
+
+class FakePopen:
+    def __init__(self, out="응답", err="", returncode=0, hang=False):
+        self.out, self.err, self.returncode, self.hang = out, err, returncode, hang
+        self.pid = 123
+        self.killed = False
+
+    def __call__(self, cmd, **kw):
+        return self
+
+    def communicate(self, prompt=None, timeout=None):
+        if self.hang and not self.killed:
+            self.killed = True  # kill 후 2차 communicate는 반환
+            raise subprocess.TimeoutExpired("cmd", timeout)
+        return self.out, self.err
+
+    def kill(self):
+        self.killed = True
+
+
+def test_run_nonzero_exit_raises(monkeypatch):
+    monkeypatch.setattr(llm.subprocess, "Popen", FakePopen(err="로그인 필요", returncode=1))
+    with pytest.raises(RuntimeError, match="로그인 필요"):
+        llm._run(["x"], "p")
+
+
+def test_run_timeout_kills_tree_and_raises(monkeypatch):
+    monkeypatch.setattr(llm.subprocess, "Popen", FakePopen(hang=True))
+    killer = FakeRunFn()  # taskkill 호출 기록
+    monkeypatch.setattr(llm.subprocess, "run", lambda cmd, **kw: killer.calls.append(cmd))
+    with pytest.raises(RuntimeError, match="초과"):
+        llm._run(["x"], "p")
+    if llm.os.name == "nt":
+        assert killer.calls and killer.calls[0][:3] == ["taskkill", "/F", "/T"]
+
+
+# --- generate_parsed ---
+
+class Out(BaseModel):
+    x: int
+
+
+def test_generate_parsed_validates_json(fake_run):
+    fake_run.out = '{"x": 3}'
+    got = generate_parsed(Config(vault="v", provider="claude"), "s", "u", Out)
+    assert got.x == 3
+    # 스키마가 프롬프트에 포함됐는지
+    assert '"x"' in fake_run.calls[0][1]
+
+
+def test_generate_parsed_retries_once_then_succeeds(fake_run):
+    outs = iter(["JSON 아님", '{"x": 7}'])
+    fake_run.out = lambda cmd: next(outs)
+    got = generate_parsed(Config(vault="v", provider="claude"), "s", "u", Out)
+    assert got.x == 7
+    assert len(fake_run.calls) == 2
+
+
+def test_generate_parsed_bad_json_raises_after_retry(fake_run):
+    fake_run.out = "JSON 아님"
+    with pytest.raises(Exception):
+        generate_parsed(Config(vault="v", provider="claude"), "s", "u", Out)
+    assert len(fake_run.calls) == 2
+
+
+@pytest.mark.parametrize("raw,expect", [
+    ('```json\n{"x": 1}\n```', '{"x": 1}'),
+    ('```JSON\n{"x": 1}\n```', '{"x": 1}'),          # 대문자 태그
+    ('```\n{"x": 1}\n```', '{"x": 1}'),
+    ('설명입니다.\n{"x": 1}\n이상입니다.', '{"x": 1}'),
+    ('{"x": 1}', '{"x": 1}'),
+    # 문자열 필드 안에 ```가 있으면 펜스 매칭이 절단되지만 brace-scan 폴백이 복구
+    ('```json\n{"x": 1, "s": "code ``` fence"}\n```', '{"x": 1, "s": "code ``` fence"}'),
+])
+def test_extract_json(raw, expect):
+    assert _extract_json(raw) == expect

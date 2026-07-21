@@ -8,8 +8,8 @@
 연구원이 자연어로 실험 로그를 입력하면 LLM이 구조화해 마크다운 볼트(옵시디언 호환)에
 저장하고, 문제 질의 시 과거 유사 사례·위키를 검색해 근거와 함께 진단을 보조한다.
 
-- 언어/스택: Python 3.10+, anthropic SDK, pydantic v2, pyyaml, pytest (src/ 레이아웃)
-- 현재 상태: **설계 문서만 존재, 구현 코드 없음** (구현은 아래 계획서의 태스크 순서대로)
+- 언어/스택: Python 3.10+, pydantic v2, pyyaml, pytest (src/ 레이아웃). LLM은 로컬 CLI subprocess 호출.
+- 현재 상태: **MVP 구현 완료** (Task 1~9 + 최종 리뷰 반영)
 
 ## 진실의 원천 문서
 
@@ -36,9 +36,9 @@
   구조화 레코드). 원문 로그는 본문에 그대로 보존. DB·인덱스 없음.
 - **검색은 LLM-select 단일 모드**: 전 레코드 요약 카탈로그(해결 정보 포함) + 위키 아티클
   목록을 LLM에 주고 관련 항목을 고르게 한다. 규모 가정: 연구실당 레코드 ≤50건.
-- **LLM 어댑터 격리**: `llm.py`만 anthropic을 안다. 기본 모델 `claude-opus-4-8`,
-  structured output은 `client.messages.parse(..., output_format=<PydanticModel>)` →
-  `response.parsed_output`.
+- **LLM 어댑터 격리**: `llm.py`만 호출 방식을 안다. API 키 없이 로컬 CLI subprocess —
+  provider `claude`(`claude -p`) / `gemini` / `codex`(`codex exec`), 기본 `claude`.
+  structured output은 스키마를 프롬프트에 포함해 JSON 출력 지시 → JSON 추출 → pydantic 검증.
 - **§2a 하드 게이트**: log의 필수 필드 재질문은 볼트 `config.yaml`이 결정
   (의미 매칭은 LLM, 게이트 판단은 코드).
 - **absorb 자동 체이닝**: log 저장 후 자동 실행(실패는 경고만 — 저장 유지), seed 끝에도
@@ -49,8 +49,8 @@
 
 ## 테스트 규칙
 
-- 단위 테스트는 **API 호출 없이** 통과해야 한다 — LLM 호출(`generate`/`generate_parsed`)은
-  전부 monkeypatch. 실제 API는 Task 9의 수동 E2E 스모크 1회뿐.
+- 단위 테스트는 **LLM 호출 없이** 통과해야 한다 — LLM 호출(`generate`/`generate_parsed`)은
+  전부 monkeypatch. 실제 CLI 호출은 수동 E2E 스모크 1회뿐.
 - 실행: `pip install -e ".[dev]"` (Task 1 이후) → `pytest`
 
 ## 환경 주의

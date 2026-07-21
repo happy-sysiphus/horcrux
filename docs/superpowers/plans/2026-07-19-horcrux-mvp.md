@@ -2,6 +2,12 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+> **개정 2026-07-21(2) — 이 계획서의 LLM 계층 기술은 구본이다.** 실행 완료 후 스펙
+> 개정으로 LLM 호출이 anthropic SDK(API 키)에서 로컬 CLI 3종(claude/gemini/codex)
+> subprocess로 대체되었다. 이 문서의 anthropic SDK·`messages.parse`·`claude-opus-4-8`
+> 기본 모델·`ANTHROPIC_API_KEY` 언급은 히스토리 기록이며, 현행은 스펙 LLM 섹션과
+> `src/horcrux/llm.py`가 정본이다.
+
 **Goal:** wet lab 실험 로그를 LLM으로 구조화해 마크다운 볼트에 저장하고, 유사 사례 검색 + 위키 편찬으로 문제 진단을 보조하는 CLI 파이프라인.
 
 **Architecture:** md 파일(frontmatter)이 진실의 원천. 생성 LLM은 `llm.py` 어댑터로 격리(클로드 기본, 제미니 교체 대비). 검색은 LLM-select 단일 모드 — 레코드 요약 + 위키 아티클 카탈로그를 LLM에 주고 관련 항목을 고르게 한다. 스펙: `docs/superpowers/specs/2026-07-19-horcrux-mvp-design.md`.

@@ -7,6 +7,8 @@
 개정 2026-07-21: 규모 가정(레코드 ≤50건) 명시, log/seed 후 absorb 자동 체이닝,
 absorb의 needs_review 스킵, 카탈로그에 해결 정보 포함(확정 원인 우선), 진단 근거
 3단 라벨링, ask 입력 힌트.
+개정 2026-07-21(2): LLM 호출을 API(anthropic SDK)에서 로컬 CLI 3종
+(claude/gemini/codex) subprocess로 대체 — MVP는 API 키 없이 CLI 로그인만으로 동작.
 
 ## 목적
 
@@ -113,9 +115,21 @@ actions_taken은 조치 있음 또는 문제 자체가 없음(category=none).
 
 ## LLM
 
-- **생성 LLM**: 어댑터(`llm.py`)로 격리. 기본 클로드(`claude-opus-4-8`, anthropic SDK,
-  structured output은 `messages.parse` + pydantic). 추후 제미니 교체 시 이 파일만 수정.
-- 설정 환경변수: `HORCRUX_VAULT`, `HORCRUX_PROVIDER`, `HORCRUX_MODEL`.
+- **생성 LLM**: 어댑터(`llm.py`)로 격리. API 키 대신 로컬 CLI subprocess 호출 —
+  provider 3개: `claude`(`claude -p`) / `gemini`(stdin 파이프 headless) /
+  `codex`(`codex exec - --skip-git-repo-check --ephemeral --sandbox read-only
+  --output-last-message <임시파일>`). 기본 `claude`. 인증은 각 CLI 로그인(구독) 그대로.
+- 프롬프트는 stdin 전달(Windows 커맨드라인 길이 제한 회피). system은 user 앞에 단순 결합.
+- structured output: 스키마(`model_json_schema()`)를 프롬프트에 포함해 "JSON만 출력" 지시
+  → 응답에서 JSON 추출(코드펜스·전후 산문 제거) → pydantic 검증. CLI는 스키마 강제가
+  없어 파싱 실패가 일상적이므로 어댑터(`generate_parsed`) 안에서 1회 재생성 —
+  모든 호출부(log·ask·seed)가 공통으로 보호된다. 그래도 실패하면 예외가 기존
+  재시도 정책(에러 처리 참조)으로 전파.
+- subprocess 타임아웃 300초. npm `.cmd` shim은 실제 CLI가 손자 프로세스라 Windows에서
+  `taskkill /T`로 프로세스 트리 전체를 종료해야 타임아웃이 실효.
+- `HORCRUX_MODEL` 미설정 시 각 CLI의 기본 모델 사용. CLI 미설치 시 설치 안내 에러.
+- 설정 환경변수: `HORCRUX_VAULT`, `HORCRUX_PROVIDER`(claude|gemini|codex), `HORCRUX_MODEL`.
+- v2에서 API 직결이 필요하면 llm.py에 provider 추가로 복귀(어댑터 인터페이스 불변).
 
 ## 검색 (LLM-select 단일 모드)
 
@@ -127,7 +141,7 @@ diagnose는 `retrieval.retrieve()`만 호출한다. 전체 레코드의 frontmat
 `미해결` / `문제 없음` — 유사도가 비슷하면 원인이 확정된 사례를 우선하도록 지시해
 feedback 루프가 검색까지 관통한다. 카탈로그에 없는 id(환각)는 코드가 필터.
 선택된 원본 레코드 전문 + 위키 아티클이 응답 생성 컨텍스트가 된다.
-임베딩·인덱스 불필요, API 키 하나로 동작 — 이 규모에선 맥락을 읽는
+임베딩·인덱스 불필요, API 키 없이 CLI 로그인만으로 동작 — 이 규모에선 맥락을 읽는
 LLM 선택이 더 정확하기도 함.
 
 레코드가 수백 건을 넘어 카탈로그가 컨텍스트 한계에 닿으면 그때 벡터 검색 계층을
@@ -145,7 +159,7 @@ LLM 선택이 더 정확하기도 함.
 - 단위: 레코드 md 라운드트립, LLM-select 검색(카탈로그 생성·환각 id 필터·위키·해결 정보),
   재질문 판정 로직(§2a), 진단 근거 3단 라벨링, absorb 멱등성·needs_review 스킵,
   log→absorb 체이닝 — 전부 LLM 모킹, API 호출 없음.
-- 통합: 실제 API로 log→ask 흐름 수동 스모크 1회 (합성 데이터).
+- 통합: 실제 CLI로 log→ask 흐름 수동 스모크 1회 (합성 데이터).
 
 ## 제외 (YAGNI)
 
