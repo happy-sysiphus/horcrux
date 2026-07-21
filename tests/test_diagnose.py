@@ -1,0 +1,58 @@
+from horcrux import diagnose as dg
+from horcrux.config import Config
+
+
+def test_answer_includes_selected_cases(tmp_path, monkeypatch):
+    from horcrux.records import ExperimentRecord, save_record
+
+    rec = ExperimentRecord(id="2026-07-19_sputter-001", date="2026-07-19",
+                           equipment=["RF 스퍼터"], experiment_type="스퍼터 증착")
+    path = save_record(tmp_path, rec, "원문", "정리")
+    monkeypatch.setattr(dg, "retrieve", lambda cfg, q, **kw: {
+        "records": [{"id": rec.id, "path": str(path)}], "wiki": []})
+    captured = {}
+
+    def fake_generate(cfg, system, user):
+        captured["user"] = user
+        return "진단 응답"
+
+    monkeypatch.setattr(dg, "generate", fake_generate)
+    out = dg.diagnose(Config(vault=tmp_path), "증착률이 낮아요")
+    assert out == "진단 응답"
+    assert "2026-07-19_sputter-001" in captured["user"]  # 사례 전문이 컨텍스트에 포함
+
+
+def test_wiki_articles_included_in_context(tmp_path, monkeypatch):
+    art = tmp_path / "wiki" / "equipment" / "rf-스퍼터.md"
+    art.parent.mkdir(parents=True)
+    art.write_text("---\nname: RF 스퍼터\n---\n\n장비 노하우 본문", encoding="utf-8")
+    monkeypatch.setattr(dg, "retrieve", lambda cfg, q, **kw: {
+        "records": [], "wiki": [{"id": "equipment/rf-스퍼터", "path": str(art)}]})
+    captured = {}
+
+    def fake_generate(cfg, system, user):
+        captured["user"] = user
+        return "응답"
+
+    monkeypatch.setattr(dg, "generate", fake_generate)
+    dg.diagnose(Config(vault=tmp_path), "질문")
+    assert "장비 노하우 본문" in captured["user"]
+
+
+def test_no_cases_labelled_general(tmp_path, monkeypatch):
+    monkeypatch.setattr(dg, "retrieve", lambda cfg, q, **kw: {"records": [], "wiki": []})
+    monkeypatch.setattr(dg, "generate", lambda cfg, s, u: "일반 지식 응답")
+    out = dg.diagnose(Config(vault=tmp_path), "질문")
+    assert "축적된 유사 사례가 없" in out
+
+
+def test_wiki_only_labelled_wiki_based(tmp_path, monkeypatch):
+    art = tmp_path / "wiki" / "equipment" / "x.md"
+    art.parent.mkdir(parents=True)
+    art.write_text("---\nname: X\n---\n\n본문", encoding="utf-8")
+    monkeypatch.setattr(dg, "retrieve", lambda cfg, q, **kw: {
+        "records": [], "wiki": [{"id": "equipment/x", "path": str(art)}]})
+    monkeypatch.setattr(dg, "generate", lambda cfg, s, u: "응답")
+    out = dg.diagnose(Config(vault=tmp_path), "질문")
+    assert "위키 아티클 기반" in out
+    assert "일반 지식" not in out
