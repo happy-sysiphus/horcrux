@@ -3,7 +3,7 @@ import pytest
 from horcrux import ingest
 from horcrux.config import Config, VaultConfig
 from horcrux.ingest import ParsedLog, missing_required, parse_log, to_record
-from horcrux.records import Parameter, Symptom
+from horcrux.records import Parameter, Symptom, load_record
 
 
 DEFAULT_VC = VaultConfig(
@@ -104,3 +104,21 @@ def test_to_record_excludes_summary(tmp_path):
     assert rec.objective == "ITO 증착"
     assert "summary" not in rec.model_dump()
     assert rec.id.startswith("2026-07-19_")
+
+
+def test_run_log_keeps_data_when_reparse_fails(tmp_path, monkeypatch):
+    calls = []
+
+    def flaky(cfg, text, vcfg=None):
+        calls.append(1)
+        if len(calls) > 1:
+            raise ValueError("boom")
+        return ParsedLog(experiment_type="스퍼터")
+
+    inputs = iter(["원문 로그", "추가 답변"])
+    monkeypatch.setattr(ingest, "parse_log", flaky)
+    monkeypatch.setattr(ingest, "read_multiline", lambda: next(inputs, ""))
+    path = ingest.run_log(Config(vault=tmp_path))
+    assert path is not None and path.exists()
+    _, body = load_record(path)
+    assert "추가 답변" in body  # 누적 원문 보존

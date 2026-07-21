@@ -135,7 +135,10 @@ def run_log(cfg: Config) -> Path | None:
         if not extra:
             break
         text = f"{text}\n\n[추가 답변]\n{extra}"
-        parsed = parse_log(cfg, text, vcfg)
+        try:
+            parsed = parse_log(cfg, text, vcfg)
+        except Exception:
+            break  # 재파싱 실패 — 직전 파싱 결과 + 누적 원문으로 저장 진행
     rec = to_record(cfg.vault, parsed, today)
     path = save_record(cfg.vault, rec, text, parsed.summary)
     print(f"\n저장됨: {path}")
