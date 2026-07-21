@@ -34,7 +34,14 @@ def main(argv: list[str] | None = None) -> None:
     cfg = load_config()
 
     if args.cmd == "log":
-        run_log(cfg)
+        path = run_log(cfg)
+        if path:
+            from .absorb import run_absorb
+            try:
+                n = run_absorb(cfg)
+                print(f"위키 갱신: {n}건")
+            except Exception as e:
+                print(f"(위키 편찬 실패 — 'horcrux absorb'로 재시도: {e})")
     elif args.cmd == "ask":
         from .diagnose import run_ask
         run_ask(cfg)
