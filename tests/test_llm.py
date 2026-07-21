@@ -38,6 +38,14 @@ def test_vault_config_from_yaml(tmp_path):
     assert vc.required_parameters == ["챔버 습도"]
 
 
+def test_vault_config_null_keys(tmp_path):
+    (tmp_path / "config.yaml").write_text(
+        "required_fields:\nrequired_parameters:\n", encoding="utf-8")
+    vc = load_vault_config(tmp_path)
+    assert vc.required_fields == GATEABLE_FIELDS
+    assert vc.required_parameters == []
+
+
 def test_unknown_provider_raises():
     cfg = Config(vault="v", provider="gemini")
 

@@ -35,7 +35,11 @@ def retrieve(cfg: Config, query: str, top_k: int = 3) -> dict:
     rec_paths: dict[str, Path] = {}
     lines = []
     for path in list_records(cfg.vault):
-        rec, _ = load_record(path)
+        try:
+            rec, _ = load_record(path)
+        except Exception:
+            print(f"(무시: 레코드 파싱 불가 — {path.name})")
+            continue
         rec_paths[rec.id] = path
         if rec.symptom.category == "none":
             res_tag = "문제 없음"

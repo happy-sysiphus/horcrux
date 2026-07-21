@@ -39,7 +39,9 @@ def load_vault_config(vault: Path) -> VaultConfig:
     if p.exists():
         import yaml
         data = yaml.safe_load(p.read_text(encoding="utf-8")) or {}
+    rf = data.get("required_fields")
+    rp = data.get("required_parameters")
     return VaultConfig(
-        required_fields=list(data.get("required_fields", GATEABLE_FIELDS)),
-        required_parameters=list(data.get("required_parameters", [])),
+        required_fields=list(rf) if rf is not None else list(GATEABLE_FIELDS),
+        required_parameters=list(rp) if rp is not None else [],
     )

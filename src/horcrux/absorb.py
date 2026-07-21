@@ -63,7 +63,11 @@ def run_absorb(cfg: Config) -> int:
     new: list[ExperimentRecord] = []
     texts_by_id: dict[str, str] = {}
     for path in list_records(cfg.vault):
-        rec, _ = load_record(path)
+        try:
+            rec, _ = load_record(path)
+        except Exception:
+            print(f"(무시: 레코드 파싱 불가 — {path.name})")
+            continue
         if rec.needs_review:
             continue  # 파싱 실패 원문 — 손편집 복구(needs_review 해제) 후 자연 편찬
         texts_by_id[rec.id] = path.read_text(encoding="utf-8")

@@ -77,6 +77,15 @@ def test_catalog_includes_resolution(tmp_path, monkeypatch):
     assert "해결: 타겟 산화" in captured["user"]
 
 
+def test_retrieve_skips_corrupt_md(tmp_path, monkeypatch):
+    make_vault(tmp_path, 1)
+    (tmp_path / "raw" / "experiments" / "zz-corrupt.md").write_text("프론트매터 없는 메모", encoding="utf-8")
+    monkeypatch.setattr(rt, "generate_parsed", lambda cfg, s, u, sc: rt.Selected(
+        record_ids=["2026-07-19_exp-000"]))
+    res = rt.retrieve(Config(vault=tmp_path), "질의")
+    assert [r["id"] for r in res["records"]] == ["2026-07-19_exp-000"]
+
+
 def test_hallucinations_do_not_consume_top_k(tmp_path, monkeypatch):
     make_vault(tmp_path, 3)
     monkeypatch.setattr(rt, "generate_parsed", lambda cfg, s, u, sc: rt.Selected(

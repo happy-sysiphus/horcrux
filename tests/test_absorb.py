@@ -68,6 +68,14 @@ def test_absorb_updates_existing_article(tmp_path, monkeypatch):
     assert any("갱신된 아티클" in u for u in captured)
 
 
+def test_absorb_skips_corrupt_md(tmp_path, monkeypatch):
+    monkeypatch.setattr(ab, "generate", lambda cfg, s, u: "아티클")
+    cfg = Config(vault=tmp_path)
+    make_rec(tmp_path, "2026-07-19_sputter-001", ["RF 스퍼터"])
+    (tmp_path / "raw" / "experiments" / "zz-note.md").write_text("옵시디언 메모", encoding="utf-8")
+    assert ab.run_absorb(cfg) == 3  # 정상 레코드 1건만 편찬 (equipment+materials+failure-mode)
+
+
 def test_absorb_skips_needs_review(tmp_path, monkeypatch):
     monkeypatch.setattr(ab, "generate", lambda cfg, s, u: "아티클")
     cfg = Config(vault=tmp_path)
