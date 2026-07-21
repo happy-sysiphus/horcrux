@@ -74,7 +74,7 @@ def write_md(path: Path, meta: dict, body: str) -> None:
 
 def read_md(path: Path) -> tuple[dict, str]:
     text = path.read_text(encoding="utf-8")
-    _, fm, body = text.split("---", 2)
+    _, fm, body = re.split(r"(?m)^---\s*$", text, maxsplit=2)
     return yaml.safe_load(fm), body.strip()
 
 

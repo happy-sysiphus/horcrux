@@ -52,3 +52,12 @@ def test_make_record_id_unique(tmp_path):
     rid2 = make_record_id(tmp_path, "2026-07-19", "박막 증착")
     assert rid1 != rid2
     assert rid1.startswith("2026-07-19_") and rid2.endswith("-002")
+
+
+def test_roundtrip_with_dashes_in_values(tmp_path):
+    rec = sample_record()
+    rec.results = "온도 구간 --- 에서 급락"
+    path = save_record(tmp_path, rec, "본문에도 --- 구분선", "정리")
+    loaded, body = load_record(path)
+    assert loaded == rec
+    assert "---" in body
