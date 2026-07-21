@@ -75,3 +75,11 @@ def test_catalog_includes_resolution(tmp_path, monkeypatch):
     monkeypatch.setattr(rt, "generate_parsed", fake_parsed)
     rt.retrieve(Config(vault=tmp_path), "질의")
     assert "해결: 타겟 산화" in captured["user"]
+
+
+def test_hallucinations_do_not_consume_top_k(tmp_path, monkeypatch):
+    make_vault(tmp_path, 3)
+    monkeypatch.setattr(rt, "generate_parsed", lambda cfg, s, u, sc: rt.Selected(
+        record_ids=["없는-1", "없는-2", "2026-07-19_exp-000", "2026-07-19_exp-001"]))
+    res = rt.retrieve(Config(vault=tmp_path), "질의", top_k=2)
+    assert [r["id"] for r in res["records"]] == ["2026-07-19_exp-000", "2026-07-19_exp-001"]

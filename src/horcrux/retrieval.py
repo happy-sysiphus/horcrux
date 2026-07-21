@@ -57,8 +57,8 @@ def retrieve(cfg: Config, query: str, top_k: int = 3) -> dict:
         "## 위키 아티클 목록\n" + ("\n".join(f"- {w}" for w in wiki) or "(없음)")
     )
     sel = generate_parsed(cfg, SELECT_SYSTEM, user, Selected)
+    valid = [r for r in sel.record_ids if r in rec_paths][:top_k]
     return {
-        "records": [{"id": r, "path": str(rec_paths[r])}
-                    for r in sel.record_ids[:top_k] if r in rec_paths],
+        "records": [{"id": r, "path": str(rec_paths[r])} for r in valid],
         "wiki": [{"id": w, "path": str(wiki[w])} for w in sel.wiki_ids if w in wiki],
     }
