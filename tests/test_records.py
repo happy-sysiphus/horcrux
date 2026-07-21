@@ -1,0 +1,54 @@
+from horcrux.records import (
+    ExperimentRecord, Parameter, Resolution, SuspectedCause, Symptom,
+    list_records, load_record, make_record_id, save_record, update_resolution,
+)
+
+
+def sample_record(rid="2026-07-19_test-001"):
+    return ExperimentRecord(
+        id=rid, date="2026-07-19", experiment_type="박막 증착",
+        objective="ITO 박막 증착", equipment=["RF 스퍼터"], materials=["ITO 타겟"],
+        parameters=[Parameter(name="RF power", value="150W", controllable=True)],
+        results="증착률 5nm/min",
+        symptom=Symptom(category="low_value", description="증착률이 평소보다 낮음"),
+        suspected_causes=[SuspectedCause(cause="타겟 표면 산화")],
+        actions_taken=["타겟 표면 확인"],
+    )
+
+
+def test_roundtrip(tmp_path):
+    rec = sample_record()
+    path = save_record(tmp_path, rec, "원문 로그입니다", "정리 서술입니다")
+    loaded, body = load_record(path)
+    assert loaded == rec
+    assert "원문 로그입니다" in body
+    assert "정리 서술입니다" in body
+    assert list_records(tmp_path) == [path]
+
+
+def test_update_resolution_confirms_cause(tmp_path):
+    rec = sample_record()
+    rec.suspected_causes.append(SuspectedCause(cause="가스 유량 오류"))
+    save_record(tmp_path, rec, "원문", "정리")
+    updated = update_resolution(tmp_path, rec.id, True, "타겟 표면 산화", note="연마 후 정상")
+    assert updated.resolution == Resolution(resolved=True, actual_cause="타겟 표면 산화", note="연마 후 정상")
+    statuses = {c.cause: c.status for c in updated.suspected_causes}
+    assert statuses == {"타겟 표면 산화": "confirmed", "가스 유량 오류": "rejected"}
+    # 디스크에도 반영
+    reloaded, _ = load_record(tmp_path / "raw" / "experiments" / f"{rec.id}.md")
+    assert reloaded.resolution.resolved is True
+
+
+def test_update_resolution_new_cause_appended(tmp_path):
+    rec = sample_record()
+    save_record(tmp_path, rec, "원문", "정리")
+    updated = update_resolution(tmp_path, rec.id, True, "기판 오염")
+    assert any(c.cause == "기판 오염" and c.status == "confirmed" for c in updated.suspected_causes)
+
+
+def test_make_record_id_unique(tmp_path):
+    rid1 = make_record_id(tmp_path, "2026-07-19", "박막 증착")
+    save_record(tmp_path, sample_record(rid1), "원문", "정리")
+    rid2 = make_record_id(tmp_path, "2026-07-19", "박막 증착")
+    assert rid1 != rid2
+    assert rid1.startswith("2026-07-19_") and rid2.endswith("-002")

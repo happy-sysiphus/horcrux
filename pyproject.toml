@@ -1,0 +1,23 @@
+[project]
+name = "horcrux"
+version = "0.1.0"
+description = "연구실 실험 기록·문제 진단 CLI"
+requires-python = ">=3.10"
+dependencies = [
+    "anthropic",
+    "pydantic>=2",
+    "pyyaml",
+]
+
+[project.optional-dependencies]
+dev = ["pytest"]
+
+[project.scripts]
+horcrux = "horcrux.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
