@@ -498,6 +498,8 @@ class HorcruxBot(discord.Client):
         key = (message.channel.id, message.author.id)
         self.busy[key] = "processing"
         try:
+            # LLM 완료까지 진행률 신호가 없으므로 접수 확인이 유일한 체감 장치
+            await message.channel.send("🔬 로그 분석 중... (수십 초~수 분 걸릴 수 있어요)")
             vcfg = load_vault_config(self.cfg.vault)
             async with message.channel.typing():
                 session, msgs = await asyncio.to_thread(
@@ -510,11 +512,13 @@ class HorcruxBot(discord.Client):
                 try:
                     reply = await self.wait_for("message", check=check, timeout=REPLY_TIMEOUT)
                     self.busy[key] = "processing"
+                    await message.channel.send("🔬 답변 반영 중...")
                     async with message.channel.typing():
                         session, msgs = await asyncio.to_thread(
                             advance_log, self.cfg, vcfg, session, reply.content)
                 except asyncio.TimeoutError:
                     self.busy[key] = "processing"
+                    await message.channel.send("⏱ 응답이 없어 있는 정보로 저장합니다...")
                     session, msgs = None, await asyncio.to_thread(
                         finalize_log, self.cfg, vcfg, session)
                 await self._send(message.channel, msgs)
@@ -527,6 +531,7 @@ class HorcruxBot(discord.Client):
         key = (message.channel.id, message.author.id)
         self.busy[key] = "processing"
         try:
+            await message.channel.send("🔍 과거 기록 검색·진단 중... (수십 초~수 분 걸릴 수 있어요)")
             async with message.channel.typing():
                 answer = await asyncio.to_thread(diagnose, self.cfg, message.content)
             await self._send(message.channel, [answer])
@@ -739,10 +744,10 @@ Expected: 전부 PASS (기존 61 + 신규 ≈15).
 - [ ] **Step 2: 수동 스모크 (사용자 개입 필요 — 토큰·서버 준비는 README 절차)**
 
 1. `$env:HORCRUX_DISCORD_TOKEN="<토큰>"; horcrux bot` — "봇 로그인" 출력 확인
-2. `#실험로그`에 일부러 빈약한 로그 입력 → 재질문 확인 → 답변 → "저장됨"(경로 포함) + 위키 갱신 확인
+2. `#실험로그`에 일부러 빈약한 로그 입력 → "🔬 로그 분석 중" 접수 메시지 → 재질문 확인 → 답변 → "저장됨"(경로 포함) + 위키 갱신 확인
 3. LLM 처리 중 같은 채널에 연속 메시지 → "⏳ 이전 메시지 처리 중" 안내 확인
 4. 매핑 밖 채널(예: #잡담)에 메시지 → 봇 무반응 확인
-5. `#질문`에 문제 입력 → 사례 인용 답변 확인
+5. `#질문`에 문제 입력 → "🔍 검색·진단 중" 접수 메시지 → 사례 인용 답변 확인
 6. `/feedback record_id:<위 id> resolved:True cause:테스트` → "해결로 기록됨" 확인
 
 - [ ] **Step 3: 브랜치 마무리**
