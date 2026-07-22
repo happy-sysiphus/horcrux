@@ -64,3 +64,18 @@
 - 벡터 검색·임베딩·인덱스 계층 (reindex 명령 포함) — 레코드 수백 건 초과 시 별도 개정으로 도입
 - ask의 재질문·질의 구조화·증상 하드 분기
 - 웹 UI, 인증/다중 사용자, 자동 스케줄링, 온프레미스 생성 LLM, 모델 재학습, 실데이터 마이그레이션 도구
+
+## 레이어 소유 경계 (병렬 작업 시)
+
+| 영역 | 소유 파일 |
+|---|---|
+| 프론트 (디스코드 봇) | `src/horcrux/bot.py`, `tests/test_bot.py` |
+| 백엔드 (코어) | `src/horcrux/{ingest,diagnose,retrieval,absorb,feedback,records,llm,config,seed}.py` + 기존 테스트 |
+| 공용 접점 | `cli.py`, `pyproject.toml`, `README.md`, `docs/**` |
+
+프론트가 의존하는 백엔드 인터페이스(전체 목록):
+`parse_log(cfg, text, vcfg)` · `missing_required(parsed, vcfg)` · `to_record(vault, parsed, date)` ·
+`save_record(vault, rec, text, summary)` · `save_unparsed(vault, text, err)` · `load_vault_config(vault)` ·
+`diagnose(cfg, text)` · `run_absorb(cfg)` · `run_feedback(cfg, id, resolved, cause, note) -> str` ·
+`run_seed(cfg, n)`.
+시그니처 변경은 백엔드 먼저 수정 후 프론트가 따라간다 — 같은 파일 동시 수정 금지.
