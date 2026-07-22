@@ -122,3 +122,10 @@ def test_run_log_keeps_data_when_reparse_fails(tmp_path, monkeypatch):
     assert path is not None and path.exists()
     _, body = load_record(path)
     assert "추가 답변" in body  # 누적 원문 보존
+
+
+def test_save_unparsed_preserves_text(tmp_path):
+    path = ingest.save_unparsed(tmp_path, "원문 로그", "boom")
+    rec, body = load_record(path)
+    assert rec.needs_review is True
+    assert "원문 로그" in body

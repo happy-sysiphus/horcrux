@@ -47,7 +47,7 @@ def main(argv: list[str] | None = None) -> None:
         run_ask(cfg)
     elif args.cmd == "feedback":
         from .feedback import run_feedback
-        run_feedback(cfg, args.record_id, args.resolved == "y", args.cause, args.note)
+        print(run_feedback(cfg, args.record_id, args.resolved == "y", args.cause, args.note))
     elif args.cmd == "absorb":
         from .absorb import run_absorb
         n = run_absorb(cfg)

@@ -91,6 +91,13 @@ def to_record(vault: Path, p: ParsedLog, date: str) -> ExperimentRecord:
     )
 
 
+def save_unparsed(vault: Path, text: str, err: str) -> Path:
+    """파싱 실패 원문을 needs_review로 보존 — CLI·봇 공용 (데이터 유실 방지)."""
+    today = _date.today().isoformat()
+    rec = ExperimentRecord(id=make_record_id(vault, today, "exp"), date=today, needs_review=True)
+    return save_record(vault, rec, text, f"(자동 파싱 실패: {err})")
+
+
 def read_multiline() -> str:
     lines, empty = [], 0
     while True:
@@ -119,9 +126,7 @@ def run_log(cfg: Config) -> Path | None:
     try:
         parsed = parse_log(cfg, text, vcfg)
     except Exception as e:
-        # 파싱 실패해도 원문은 보존
-        rec = ExperimentRecord(id=make_record_id(cfg.vault, today, "exp"), date=today, needs_review=True)
-        path = save_record(cfg.vault, rec, text, f"(자동 파싱 실패: {e})")
+        path = save_unparsed(cfg.vault, text, str(e))
         print(f"파싱에 실패해 원문만 저장했습니다 (needs_review): {path}")
         return path
     for _ in range(3):
