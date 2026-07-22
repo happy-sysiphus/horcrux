@@ -56,7 +56,8 @@ Horcrux 백엔드(실험 기록·진단 파이프라인)의 프론트엔드. 봇
 
 - LLM 호출은 블로킹 subprocess(최대 300초) — `asyncio.to_thread`로 감싸 이벤트 루프 보호.
 - 재질문 세션은 (채널 id, 유저 id) 키 dict — 유저·채널당 진행 중 세션 1개.
-  진행 중 세션이 있는 유저의 메시지는 재질문 답변으로 소비.
+  재질문 답변 대기 중 메시지는 답변으로 소비. LLM 처리 중(대기 리스너 없음)에 온
+  메시지는 무통보 유실 대신 "처리 중" 안내를 회신.
 - 봇 자신의 메시지는 무시 (`message.author == bot.user` — on_message 재귀 방지).
 - `message_content`는 privileged intent — Discord 개발자 포털에서 켜고 코드에서도
   `intents.message_content = True` 명시 필요.
@@ -69,16 +70,19 @@ Horcrux 백엔드(실험 기록·진단 파이프라인)의 프론트엔드. 봇
 ingest.parse_log(cfg, text, vcfg) -> ParsedLog
 ingest.missing_required(parsed, vcfg) -> list[str]      # 재질문 문항 목록
 ingest.to_record(vault, parsed, date) -> ExperimentRecord
+ingest.save_unparsed(vault, text, err) -> Path          # 파싱 실패 원문 needs_review 저장 (신설)
+config.load_vault_config(vault) -> VaultConfig
 records.save_record(vault, rec, text, summary) -> Path
 diagnose.diagnose(cfg, text) -> str
 absorb.run_absorb(cfg) -> int
-feedback.run_feedback(cfg, record_id, resolved, cause, note) -> str   # 변경 1건
+feedback.run_feedback(cfg, record_id, resolved, cause, note) -> str   # 변경
 seed.run_seed(cfg, n) -> int
 ```
 
-**백엔드 변경은 단 1건**: `run_feedback`이 현재 print만 하고 `None` 반환 — 결과 메시지
-문자열을 반환하도록 변경하고 CLI 경로는 `print(run_feedback(...))`로 유지.
-그 외 백엔드 파일은 손대지 않는다.
+**백엔드 변경은 2건뿐**: (1) `run_feedback`이 print 대신 결과 메시지 문자열을 반환하고
+CLI 경로는 `print(run_feedback(...))`로 유지, (2) `run_log`의 파싱 실패 폴백(needs_review
+저장)을 `save_unparsed`로 추출해 CLI·봇이 공유 (동일 로직 복제 방지). 그 외 백엔드
+파일은 손대지 않는다.
 
 ## 테스트
 
