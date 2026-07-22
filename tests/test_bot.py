@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pytest
 
 from horcrux import bot
@@ -155,6 +157,35 @@ def test_save_attachments_sanitizes_filename(tmp_path):
 
 def test_save_attachments_empty(tmp_path):
     assert save_attachments(tmp_path, "rid", []) == []
+
+
+def test_save_attachments_dedupes_duplicate_names(tmp_path):
+    # 디스코드 클립보드 이미지는 전부 image.png — 같은 세션 내 동명 첨부가 서로 덮어써선 안 됨
+    links = save_attachments(tmp_path, "rid-001", [("image.png", b"1"), ("image.png", b"2")])
+    d = tmp_path / "raw" / "attachments" / "rid-001"
+    assert (d / "image.png").read_bytes() == b"1"
+    assert (d / "2-image.png").read_bytes() == b"2"
+    assert links == [
+        "![[raw/attachments/rid-001/image.png]]",
+        "![[raw/attachments/rid-001/2-image.png]]",
+    ]
+
+
+def test_save_attachments_write_failure_does_not_raise_or_drop_record(monkeypatch, tmp_path):
+    orig_write = Path.write_bytes
+
+    def flaky(self, data):
+        if self.name == "bad.png":
+            raise OSError("디스크 오류")
+        return orig_write(self, data)
+
+    monkeypatch.setattr(Path, "write_bytes", flaky)
+    links = save_attachments(tmp_path, "rid-001", [("bad.png", b"x"), ("ok.png", b"y")])
+    d = tmp_path / "raw" / "attachments" / "rid-001"
+    assert not (d / "bad.png").exists()
+    assert (d / "ok.png").read_bytes() == b"y"
+    assert links[0] == "(첨부 저장 실패: bad.png)"
+    assert links[1] == "![[raw/attachments/rid-001/ok.png]]"
 
 
 def test_advance_log_parse_failure_keeps_attachments(monkeypatch, tmp_path):

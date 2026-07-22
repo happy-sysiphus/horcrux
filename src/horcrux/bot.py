@@ -23,7 +23,9 @@ REPLY_TIMEOUT = 600  # 재질문 응답 대기 (초)
 MSG_LIMIT = 2000     # 디스코드 메시지 길이 제한
 
 # ponytail: 전역 볼트 쓰기 락 — 동시 저장 시 record id 순번 경쟁(덮어쓰기)·
-# _absorb_log.json 경쟁 방지. 처리량이 문제되면 볼트별 락으로 세분화.
+# _absorb_log.json 경쟁 방지. absorb_after·/absorb·/seed는 LLM 생성 동안까지 이 락을
+# 쥐고 있어 그 사이 다른 세션의 저장(finalize_log)이 전부 막힘 — 처리량 병목의 실제
+# 천장은 LLM 호출 시간. 문제되면 레코드 저장 락과 absorb 직렬화 락을 분리.
 _VAULT_LOCK = threading.Lock()
 
 
@@ -62,12 +64,22 @@ def save_attachments(vault: Path, rec_id: str, files: list[tuple[str, bytes]]) -
     d = Path(vault) / "raw" / "attachments" / rec_id
     d.mkdir(parents=True, exist_ok=True)
     links = []
+    used: set[str] = set()
     for name, data in files:
         safe = os.path.basename(name.replace("\\", "/"))
         if safe in ("", ".", ".."):  # '..'가 통과하면 디렉터리 자체가 타겟 — 저장 실패로 레코드 유실
             safe = "attachment"
-        (d / safe).write_bytes(data)
-        links.append(f"![[raw/attachments/{rec_id}/{safe}]]")
+        dedup, i = safe, 2
+        while dedup in used:  # 디스코드 클립보드 이미지는 전부 image.png — 동명 첨부 덮어쓰기 방지
+            dedup = f"{i}-{safe}"
+            i += 1
+        used.add(dedup)
+        try:
+            (d / dedup).write_bytes(data)
+        except Exception:  # 첨부 하나 저장 실패로 파싱된 레코드 전체를 잃으면 안 됨
+            links.append(f"(첨부 저장 실패: {dedup})")
+            continue
+        links.append(f"![[raw/attachments/{rec_id}/{dedup}]]")
     return links
 
 
