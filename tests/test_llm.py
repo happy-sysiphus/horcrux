@@ -1,6 +1,8 @@
 import subprocess
+from pathlib import Path
 
 import pytest
+import yaml
 from pydantic import BaseModel
 
 from horcrux import llm
@@ -8,16 +10,17 @@ from horcrux.config import GATEABLE_FIELDS, Config, load_config, load_vault_conf
 from horcrux.llm import _extract_json, generate, generate_parsed
 
 
-def test_load_config_defaults(monkeypatch):
-    for k in ("HORCRUX_VAULT", "HORCRUX_PROVIDER", "HORCRUX_MODEL"):
-        monkeypatch.delenv(k, raising=False)
+def test_load_config_defaults(isolated_config):
     cfg = load_config()
     assert cfg.provider == "claude"
     assert cfg.model is None
     assert str(cfg.vault) == "example-vault"
+    assert cfg.discord_token is None
+    assert cfg.log_channel == "실험로그"
+    assert cfg.ask_channel == "질문"
 
 
-def test_load_config_env_override(monkeypatch):
+def test_load_config_env_override(isolated_config, monkeypatch):
     monkeypatch.setenv("HORCRUX_VAULT", "my-lab")
     monkeypatch.setenv("HORCRUX_PROVIDER", "gemini")
     monkeypatch.setenv("HORCRUX_MODEL", "gemini-2.5-pro")
@@ -25,6 +28,48 @@ def test_load_config_env_override(monkeypatch):
     assert str(cfg.vault) == "my-lab"
     assert cfg.provider == "gemini"
     assert cfg.model == "gemini-2.5-pro"
+
+
+def test_load_config_from_file(isolated_config):
+    isolated_config.write_text(yaml.safe_dump({
+        "discord_token": "tok", "vault": "C:/lab/v", "provider": "codex",
+        "log_channel": "lab-log",
+    }, allow_unicode=True), encoding="utf-8")
+    cfg = load_config()
+    assert cfg.discord_token == "tok"
+    assert cfg.vault == Path("C:/lab/v")
+    assert cfg.provider == "codex"
+    assert cfg.log_channel == "lab-log"
+    assert cfg.ask_channel == "질문"  # 파일에 없는 키는 기본값
+
+
+def test_env_beats_file(isolated_config, monkeypatch):
+    isolated_config.write_text(yaml.safe_dump({"provider": "codex"}), encoding="utf-8")
+    monkeypatch.setenv("HORCRUX_PROVIDER", "claude")
+    assert load_config().provider == "claude"
+
+
+def test_save_config_roundtrip(isolated_config):
+    from horcrux.config import save_config
+    path = save_config({"discord_token": "t", "vault": "C:/v", "provider": "claude",
+                        "model": None, "log_channel": "실험로그", "ask_channel": "질문"})
+    assert path == isolated_config
+    cfg = load_config()
+    assert cfg.discord_token == "t" and cfg.vault == Path("C:/v")
+
+
+def test_save_config_creates_parent_dir(monkeypatch, tmp_path):
+    from horcrux import config as config_mod
+    p = tmp_path / "deep" / "config.yaml"
+    monkeypatch.setattr(config_mod, "_config_path", lambda: p, raising=False)
+    from horcrux.config import save_config
+    save_config({"provider": "claude"})
+    assert p.exists()
+
+
+def test_load_config_ignores_corrupt_file(isolated_config):
+    isolated_config.write_text("그냥 문자열", encoding="utf-8")  # dict 아닌 YAML
+    assert load_config().provider == "claude"  # 트레이스백 없이 기본값
 
 
 def test_vault_config_defaults(tmp_path):

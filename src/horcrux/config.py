@@ -10,17 +10,46 @@ class Config:
     vault: Path
     provider: str = "claude"
     model: str | None = None  # None = 각 CLI의 기본 모델 사용
+    discord_token: str | None = None
+    log_channel: str = "실험로그"
+    ask_channel: str = "질문"
 
     def __post_init__(self):
         self.vault = Path(self.vault)
 
 
+def _config_path() -> Path:
+    # 프로그램 설정 — 볼트의 config.yaml(연구실 게이트 설정)과 별개
+    return Path.home() / ".horcrux" / "config.yaml"
+
+
 def load_config() -> Config:
+    data = {}
+    p = _config_path()
+    if p.exists():
+        import yaml
+        loaded = yaml.safe_load(p.read_text(encoding="utf-8"))
+        data = loaded if isinstance(loaded, dict) else {}  # 깨진 파일은 무시 — init으로 재작성
+
+    def pick(env_key: str, file_key: str, default):
+        return os.environ.get(env_key) or data.get(file_key) or default
+
     return Config(
-        vault=Path(os.environ.get("HORCRUX_VAULT", "example-vault")),
-        provider=os.environ.get("HORCRUX_PROVIDER", "claude"),
-        model=os.environ.get("HORCRUX_MODEL") or None,
+        vault=Path(pick("HORCRUX_VAULT", "vault", "example-vault")),
+        provider=pick("HORCRUX_PROVIDER", "provider", "claude"),
+        model=pick("HORCRUX_MODEL", "model", None),
+        discord_token=pick("HORCRUX_DISCORD_TOKEN", "discord_token", None),
+        log_channel=pick("HORCRUX_LOG_CHANNEL", "log_channel", "실험로그"),
+        ask_channel=pick("HORCRUX_ASK_CHANNEL", "ask_channel", "질문"),
     )
+
+
+def save_config(values: dict) -> Path:
+    import yaml
+    p = _config_path()
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(yaml.safe_dump(values, allow_unicode=True, sort_keys=False), encoding="utf-8")
+    return p
 
 
 # §2a — 구조 카테고리 하드 게이트 후보 (볼트 config.yaml의 required_fields가 이 중에서 선택)
