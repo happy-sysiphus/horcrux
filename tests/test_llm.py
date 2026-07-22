@@ -72,6 +72,11 @@ def test_load_config_ignores_corrupt_file(isolated_config):
     assert load_config().provider == "claude"  # 트레이스백 없이 기본값
 
 
+def test_load_config_ignores_malformed_yaml(isolated_config):
+    isolated_config.write_text("provider: [unclosed\n  key: :bad", encoding="utf-8")  # 구문 오류
+    assert load_config().provider == "claude"  # 트레이스백 없이 기본값
+
+
 def test_vault_config_defaults(tmp_path):
     vc = load_vault_config(tmp_path)
     assert vc.required_fields == GATEABLE_FIELDS

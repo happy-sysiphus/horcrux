@@ -28,7 +28,10 @@ def load_config() -> Config:
     p = _config_path()
     if p.exists():
         import yaml
-        loaded = yaml.safe_load(p.read_text(encoding="utf-8"))
+        try:
+            loaded = yaml.safe_load(p.read_text(encoding="utf-8"))
+        except yaml.YAMLError:
+            loaded = None
         data = loaded if isinstance(loaded, dict) else {}  # 깨진 파일은 무시 — init으로 재작성
 
     def pick(env_key: str, file_key: str, default):
