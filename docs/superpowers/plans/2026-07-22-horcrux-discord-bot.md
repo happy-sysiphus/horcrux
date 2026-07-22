@@ -139,7 +139,7 @@ git commit -m "feat: run_feedback 메시지 반환·save_unparsed 추출 (봇 �
 
 **Interfaces:**
 - Consumes: `ingest.parse_log(cfg, text, vcfg) -> ParsedLog`, `ingest.missing_required(parsed, vcfg) -> list[str]`, `ingest.to_record(vault, parsed, date) -> ExperimentRecord`, `ingest.save_unparsed(vault, text, err) -> Path` (Task 1), `records.save_record(vault, rec, text, summary) -> Path`, `absorb.run_absorb(cfg) -> int`
-- Produces: `LogSession` (dataclass: `text: str`, `parsed: ParsedLog`, `rounds: int`), `advance_log(cfg, vcfg, session: LogSession | None, text: str) -> tuple[LogSession | None, list[str]]`, `finalize_log(cfg, vcfg, session: LogSession) -> list[str]`, `split_message(text: str, limit: int = 2000) -> list[str]`, `route(channel_name: str | None, log_channel: str, ask_channel: str) -> str | None` (`"log"`/`"ask"`/`None`)
+- Produces: `LogSession` (dataclass: `text: str`, `parsed: ParsedLog`, `rounds: int = 0`, `files: list[tuple[str, bytes]]`), `advance_log(cfg, vcfg, session: LogSession | None, text: str, files: list[tuple[str, bytes]] | None = None) -> tuple[LogSession | None, list[str]]`, `finalize_log(cfg, vcfg, session: LogSession) -> list[str]` (저장·첨부만 — absorb 없음), `absorb_after(cfg) -> list[str]` (0건이면 빈 리스트), `save_attachments(vault, rec_id, files) -> list[str]` (옵시디언 링크 목록), `split_message(text: str, limit: int = 2000) -> list[str]`, `route(channel_name: str | None, log_channel: str, ask_channel: str) -> str | None` (`"log"`/`"ask"`/`None`)
 
 - [ ] **Step 1: 의존성 추가 + 설치**
 
@@ -156,7 +156,10 @@ Expected: discord.py 2.6 이상 설치 (현재 최신 2.7.x — 버전 문자열
 import pytest
 
 from horcrux import bot
-from horcrux.bot import LogSession, advance_log, finalize_log, route, split_message
+from horcrux.bot import (
+    LogSession, absorb_after, advance_log, finalize_log, route,
+    save_attachments, split_message,
+)
 from horcrux.config import Config, VaultConfig
 from horcrux.ingest import ParsedLog
 from horcrux.records import Parameter, Symptom
@@ -212,13 +215,11 @@ def test_route_channel_mapping():
 
 # --- advance_log / finalize_log ---
 
-def test_advance_log_complete_saves_and_absorbs(monkeypatch, tmp_path):
+def test_advance_log_complete_saves(monkeypatch, tmp_path):
     monkeypatch.setattr(bot, "parse_log", lambda c, t, v: full_parsed())
-    monkeypatch.setattr(bot, "run_absorb", lambda c: 2)
     session, msgs = advance_log(cfg(tmp_path), VC, None, "완결 로그 원문")
     assert session is None
-    joined = "\n".join(msgs)
-    assert "저장됨" in joined and "위키 갱신: 2건" in joined
+    assert "저장됨" in "\n".join(msgs)
     assert len(saved_files(tmp_path)) == 1
 
 
@@ -232,7 +233,6 @@ def test_advance_log_gaps_asks_question(monkeypatch, tmp_path):
 
 def test_advance_log_round_cap_saves_after_three(monkeypatch, tmp_path):
     monkeypatch.setattr(bot, "parse_log", lambda c, t, v: ParsedLog())  # 계속 빈 필드
-    monkeypatch.setattr(bot, "run_absorb", lambda c: 0)
     session, _ = advance_log(cfg(tmp_path), VC, None, "빈약한 로그")
     for expected_round in (2, 3):
         session, msgs = advance_log(cfg(tmp_path), VC, session, "여전히 빈약")
@@ -252,7 +252,6 @@ def test_advance_log_empty_reply_skips_reparse(monkeypatch, tmp_path):
         return ParsedLog()
 
     monkeypatch.setattr(bot, "parse_log", fake)
-    monkeypatch.setattr(bot, "run_absorb", lambda c: 0)
     session, _ = advance_log(cfg(tmp_path), VC, None, "빈약한 로그")
     session, msgs = advance_log(cfg(tmp_path), VC, session, "   ")  # 빈 답변 (첨부만 등)
     assert session is None
@@ -272,7 +271,6 @@ def test_advance_log_parse_failure_saves_needs_review(monkeypatch, tmp_path):
 
 
 def test_advance_log_continue_parse_failure_finalizes_previous(monkeypatch, tmp_path):
-    monkeypatch.setattr(bot, "run_absorb", lambda c: 0)
     monkeypatch.setattr(bot, "parse_log", lambda c, t, v: ParsedLog())
     session, _ = advance_log(cfg(tmp_path), VC, None, "빈약한 로그")
 
@@ -285,15 +283,60 @@ def test_advance_log_continue_parse_failure_finalizes_previous(monkeypatch, tmp_
     assert len(saved_files(tmp_path)) == 1
 
 
-def test_finalize_absorb_failure_warns_but_saves(monkeypatch, tmp_path):
+def test_finalize_log_saves_with_attachments(tmp_path):
+    session = LogSession(text="원문", parsed=full_parsed(), files=[("결과.png", b"PNG")])
+    msgs = finalize_log(cfg(tmp_path), VC, session)
+    assert "저장됨" in msgs[0]
+    md = saved_files(tmp_path)[0]
+    att = tmp_path / "raw" / "attachments" / md.stem / "결과.png"
+    assert att.read_bytes() == b"PNG"
+    assert "![[" in md.read_text(encoding="utf-8")  # 본문에 옵시디언 임베드 링크
+
+
+# --- save_attachments / absorb_after ---
+
+def test_save_attachments_writes_and_links(tmp_path):
+    links = save_attachments(tmp_path, "rid-001", [("a.png", b"1")])
+    assert (tmp_path / "raw" / "attachments" / "rid-001" / "a.png").read_bytes() == b"1"
+    assert links == ["![[raw/attachments/rid-001/a.png]]"]
+
+
+def test_save_attachments_sanitizes_filename(tmp_path):
+    save_attachments(tmp_path, "rid-001", [("..\\evil.txt", b"x"), ("..", b"y")])
+    d = tmp_path / "raw" / "attachments" / "rid-001"
+    assert (d / "evil.txt").read_bytes() == b"x"
+    assert (d / "attachment").read_bytes() == b"y"  # '.'/'..'는 안전한 이름으로 대체
+
+
+def test_save_attachments_empty(tmp_path):
+    assert save_attachments(tmp_path, "rid", []) == []
+
+
+def test_advance_log_parse_failure_keeps_attachments(monkeypatch, tmp_path):
+    def boom(c, t, v):
+        raise RuntimeError("CLI 실패")
+    monkeypatch.setattr(bot, "parse_log", boom)
+    session, msgs = advance_log(cfg(tmp_path), VC, None, "원문", files=[("img.png", b"P")])
+    assert session is None and "needs_review" in msgs[0]
+    rec_id = saved_files(tmp_path)[0].stem
+    assert (tmp_path / "raw" / "attachments" / rec_id / "img.png").read_bytes() == b"P"
+
+
+def test_absorb_after_reports_count(monkeypatch, tmp_path):
+    monkeypatch.setattr(bot, "run_absorb", lambda c: 2)
+    assert absorb_after(cfg(tmp_path)) == ["위키 갱신: 2건"]
+
+
+def test_absorb_after_zero_is_silent(monkeypatch, tmp_path):
+    monkeypatch.setattr(bot, "run_absorb", lambda c: 0)
+    assert absorb_after(cfg(tmp_path)) == []
+
+
+def test_absorb_after_failure_warns(monkeypatch, tmp_path):
     def boom(c):
         raise RuntimeError("편찬 실패")
     monkeypatch.setattr(bot, "run_absorb", boom)
-    session = LogSession(text="원문", parsed=full_parsed(), rounds=0)
-    msgs = finalize_log(cfg(tmp_path), VC, session)
-    joined = "\n".join(msgs)
-    assert "저장됨" in joined and "위키 편찬 실패" in joined
-    assert len(saved_files(tmp_path)) == 1
+    assert "위키 편찬 실패" in absorb_after(cfg(tmp_path))[0]
 ```
 
 - [ ] **Step 3: 실패 확인**
@@ -308,8 +351,11 @@ Expected: FAIL — 수집 단계 임포트 에러 `ImportError: cannot import na
 ```python
 from __future__ import annotations
 
-from dataclasses import dataclass
+import os
+import threading
+from dataclasses import dataclass, field
 from datetime import date as _date
+from pathlib import Path
 
 from .absorb import run_absorb
 from .config import Config, VaultConfig
@@ -320,12 +366,24 @@ MAX_ROUNDS = 3       # 재질문 최대 횟수
 REPLY_TIMEOUT = 600  # 재질문 응답 대기 (초)
 MSG_LIMIT = 2000     # 디스코드 메시지 길이 제한
 
+# ponytail: 전역 볼트 쓰기 락 — 동시 저장 시 record id 순번 경쟁(덮어쓰기)·
+# _absorb_log.json 경쟁 방지. 처리량이 문제되면 볼트별 락으로 세분화.
+_VAULT_LOCK = threading.Lock()
+
+
+def _locked(fn, *args):
+    """볼트 쓰기 진입점 공용 래퍼 — 슬래시 커맨드(run_absorb/run_seed/run_feedback)도
+    반드시 이 경유로 호출해 락을 우회하지 않게 한다."""
+    with _VAULT_LOCK:
+        return fn(*args)
+
 
 @dataclass
 class LogSession:
     text: str          # 누적 원문 (원본 + 추가 답변)
     parsed: ParsedLog
     rounds: int = 0    # 지금까지 던진 재질문 횟수
+    files: list[tuple[str, bytes]] = field(default_factory=list)  # 첨부 (파일명, 내용)
 
 
 def split_message(text: str, limit: int = MSG_LIMIT) -> list[str]:
@@ -341,17 +399,38 @@ def route(channel_name: str | None, log_channel: str, ask_channel: str) -> str |
     return None
 
 
-def advance_log(cfg: Config, vcfg: VaultConfig, session: LogSession | None,
-                text: str) -> tuple[LogSession | None, list[str]]:
+def save_attachments(vault: Path, rec_id: str, files: list[tuple[str, bytes]]) -> list[str]:
+    """첨부를 볼트에 저장하고 옵시디언 임베드 링크 목록 반환. 내용 분석은 없음(보관만)."""
+    if not files:
+        return []
+    d = Path(vault) / "raw" / "attachments" / rec_id
+    d.mkdir(parents=True, exist_ok=True)
+    links = []
+    for name, data in files:
+        safe = os.path.basename(name.replace("\\", "/"))
+        if safe in ("", ".", ".."):  # '..'가 통과하면 디렉터리 자체가 타겟 — 저장 실패로 레코드 유실
+            safe = "attachment"
+        (d / safe).write_bytes(data)
+        links.append(f"![[raw/attachments/{rec_id}/{safe}]]")
+    return links
+
+
+def advance_log(cfg: Config, vcfg: VaultConfig, session: LogSession | None, text: str,
+                files: list[tuple[str, bytes]] | None = None,
+                ) -> tuple[LogSession | None, list[str]]:
     """log 대화 한 스텝. (다음 세션 또는 None, 회신 메시지들) 반환."""
+    files = files or []
     if session is None:
         try:
             parsed = parse_log(cfg, text, vcfg)
         except Exception as e:
-            path = save_unparsed(cfg.vault, text, str(e))
+            with _VAULT_LOCK:
+                path = save_unparsed(cfg.vault, text, str(e))
+                save_attachments(cfg.vault, path.stem, files)  # 첨부도 유실 없이 보존
             return None, [f"파싱에 실패해 원문만 저장했습니다 (needs_review): {path}"]
-        session = LogSession(text=text, parsed=parsed)
+        session = LogSession(text=text, parsed=parsed, files=list(files))
     else:
+        session.files.extend(files)
         if not text.strip():  # 빈 답변(첨부만 등) — 재파싱 없이 있는 정보로 저장
             return None, finalize_log(cfg, vcfg, session)
         session.text = f"{session.text}\n\n[추가 답변]\n{text}"
@@ -368,24 +447,33 @@ def advance_log(cfg: Config, vcfg: VaultConfig, session: LogSession | None,
 
 
 def finalize_log(cfg: Config, vcfg: VaultConfig, session: LogSession) -> list[str]:
+    """저장 + 첨부만 — 위키 편찬은 absorb_after로 분리 (저장 확인을 즉시 회신하기 위함)."""
     today = _date.today().isoformat()
-    rec = to_record(cfg.vault, session.parsed, today)
-    path = save_record(cfg.vault, rec, session.text, session.parsed.summary)
+    with _VAULT_LOCK:
+        rec = to_record(cfg.vault, session.parsed, today)
+        links = save_attachments(cfg.vault, rec.id, session.files)
+        body = session.text + ("\n\n[첨부]\n" + "\n".join(links) if links else "")
+        path = save_record(cfg.vault, rec, body, session.parsed.summary)
     msgs = [f"저장됨: `{rec.id}` ({path})\n{session.parsed.summary}".strip()]
     if missing_required(session.parsed, vcfg):
         msgs.append("(일부 필수 정보가 비어 있는 채로 저장됨)")
-    try:
-        n = run_absorb(cfg)
-        msgs.append(f"위키 갱신: {n}건")
-    except Exception as e:
-        msgs.append(f"(위키 편찬 실패 — /absorb로 재시도: {e})")
     return msgs
+
+
+def absorb_after(cfg: Config) -> list[str]:
+    """저장 확인과 분리된 후속 위키 편찬. 갱신 0건이면 조용히 빈 리스트."""
+    try:
+        with _VAULT_LOCK:
+            n = run_absorb(cfg)
+        return [f"위키 갱신: {n}건"] if n else []
+    except Exception as e:
+        return [f"(위키 편찬 실패 — /absorb로 재시도: {e})"]
 ```
 
 - [ ] **Step 5: 통과 확인**
 
 Run: `python -m pytest -q --basetemp=.pytest_tmp tests/test_bot.py`
-Expected: PASS 전부 (11개).
+Expected: PASS 전부 (18개).
 
 - [ ] **Step 6: Commit**
 
@@ -403,7 +491,7 @@ git commit -m "feat: 봇 순수 대화 로직 — log 세션 상태 머신·메�
 - Test: `tests/test_bot.py` (오프라인 구성 테스트 추가)
 
 **Interfaces:**
-- Consumes: Task 2의 `advance_log`/`finalize_log`/`split_message`, `diagnose.diagnose(cfg, text) -> str`, `feedback.run_feedback(...) -> str` (Task 1), `seed.run_seed(cfg, n) -> int`
+- Consumes: Task 2의 `advance_log`/`finalize_log`/`absorb_after`/`route`/`split_message`, `diagnose.diagnose(cfg, text) -> str`, `feedback.run_feedback(...) -> str` (Task 1), `seed.run_seed(cfg, n) -> int`
 - Produces: `build_client(cfg: Config) -> HorcruxBot` (연결 없이 구성 가능 — 테스트 대상), `run_bot(cfg: Config) -> None` (토큰 검사 후 `client.run(token)`)
 
 - [ ] **Step 1: 실패 테스트 추가**
@@ -458,6 +546,7 @@ class HorcruxBot(discord.Client):
         self.ask_channel = os.environ.get("HORCRUX_ASK_CHANNEL", "질문")
         # (channel_id, user_id) → "processing"(LLM 처리 중) | "waiting"(재질문 답변 대기)
         self.busy: dict[tuple[int, int], str] = {}
+        self._claimed: set[int] = set()  # wait_for가 소비할 메시지 id — on_message 오탐 방지
         self._synced = False
         self.tree = app_commands.CommandTree(self)
         _register_commands(self)
@@ -475,13 +564,18 @@ class HorcruxBot(discord.Client):
     async def on_message(self, message: discord.Message):
         if message.author.bot:
             return
+        if message.id in self._claimed:
+            # wait_for가 소비한 재질문 답변 — dispatch가 wait_for future를 먼저 깨우므로
+            # (Python 3.12+에선 _log_flow가 먼저 재개됨) busy 상태만으론 오탐이 남
+            self._claimed.discard(message.id)
+            return
         key = (message.channel.id, message.author.id)
         state = self.busy.get(key)
         if state == "waiting":
-            return  # 재질문 답변 — wait_for가 소비
+            return  # 대기 중 경합 백스톱
         if state == "processing":
             # LLM 처리 중엔 대기 리스너가 없음 — 무통보 유실 대신 안내
-            await message.channel.send("⏳ 이전 메시지 처리 중 — 끝나면 다시 보내주세요.")
+            await self._reply(message, "⏳ 이전 메시지 처리 중 — 끝나면 다시 보내주세요.")
             return
         kind = route(getattr(message.channel, "name", None), self.log_channel, self.ask_channel)
         if kind == "log":
@@ -489,41 +583,70 @@ class HorcruxBot(discord.Client):
         elif kind == "ask":
             await self._ask_flow(message)
 
-    async def _send(self, channel, msgs: list[str]) -> None:
+    @staticmethod
+    async def _reply(message: discord.Message, text: str) -> None:
+        # 원 메시지가 삭제됐으면 reply가 400 (Unknown message) — 채널 전송으로 폴백
+        try:
+            await message.reply(text)
+        except discord.HTTPException:
+            await message.channel.send(text)
+
+    async def _send(self, message: discord.Message, msgs: list[str]) -> None:
+        # 첫 청크는 원 메시지에 답장(reply) — 다중 유저 채널 귀속 명확 + 작성자 알림
+        first = True
         for m in msgs:
             for chunk in split_message(m):
-                await channel.send(chunk)
+                if first:
+                    await self._reply(message, chunk)
+                    first = False
+                else:
+                    await message.channel.send(chunk)
+
+    @staticmethod
+    async def _read_files(message: discord.Message) -> list[tuple[str, bytes]]:
+        return [(a.filename, await a.read()) for a in message.attachments]
 
     async def _log_flow(self, message: discord.Message) -> None:
         key = (message.channel.id, message.author.id)
         self.busy[key] = "processing"
         try:
+            if not message.content.strip():
+                await self._reply(message, "첨부만으론 기록할 수 없어요 — 텍스트 로그와 함께 보내주세요.")
+                return
             # LLM 완료까지 진행률 신호가 없으므로 접수 확인이 유일한 체감 장치
-            await message.channel.send("🔬 로그 분석 중... (수십 초~수 분 걸릴 수 있어요)")
+            await self._reply(message, "🔬 로그 분석 중... (수십 초~수 분 걸릴 수 있어요)")
             vcfg = load_vault_config(self.cfg.vault)
+            files = await self._read_files(message)
             async with message.channel.typing():
                 session, msgs = await asyncio.to_thread(
-                    advance_log, self.cfg, vcfg, None, message.content)
-            await self._send(message.channel, msgs)
+                    advance_log, self.cfg, vcfg, None, message.content, files)
+            await self._send(message, msgs)
             while session:
                 def check(m, _a=message.author, _c=message.channel):
-                    return m.author == _a and m.channel == _c
+                    ok = m.author == _a and m.channel == _c
+                    if ok:
+                        self._claimed.add(m.id)  # dispatch 시점(동기)에 선점 — on_message 오탐 방지
+                    return ok
                 self.busy[key] = "waiting"
                 try:
                     reply = await self.wait_for("message", check=check, timeout=REPLY_TIMEOUT)
                     self.busy[key] = "processing"
-                    await message.channel.send("🔬 답변 반영 중...")
+                    await self._reply(reply, "🔬 답변 반영 중...")
+                    rfiles = await self._read_files(reply)
                     async with message.channel.typing():
                         session, msgs = await asyncio.to_thread(
-                            advance_log, self.cfg, vcfg, session, reply.content)
+                            advance_log, self.cfg, vcfg, session, reply.content, rfiles)
                 except asyncio.TimeoutError:
                     self.busy[key] = "processing"
-                    await message.channel.send("⏱ 응답이 없어 있는 정보로 저장합니다...")
+                    await self._reply(message, "⏱ 응답이 없어 있는 정보로 저장합니다...")
                     session, msgs = None, await asyncio.to_thread(
                         finalize_log, self.cfg, vcfg, session)
-                await self._send(message.channel, msgs)
+                await self._send(message, msgs)
+            # 저장 확인과 분리된 후속 위키 편찬 (0건이면 조용히 생략)
+            wiki_msgs = await asyncio.to_thread(absorb_after, self.cfg)
+            await self._send(message, wiki_msgs)
         except Exception as e:
-            await self._send(message.channel, [f"⚠ 오류: {e}"])
+            await self._send(message, [f"⚠ 오류: {e}"])
         finally:
             self.busy.pop(key, None)
 
@@ -531,14 +654,28 @@ class HorcruxBot(discord.Client):
         key = (message.channel.id, message.author.id)
         self.busy[key] = "processing"
         try:
-            await message.channel.send("🔍 과거 기록 검색·진단 중... (수십 초~수 분 걸릴 수 있어요)")
+            if message.attachments:
+                await self._reply(message, "(첨부는 진단 분석에 사용되지 않아요 — 텍스트만 참고합니다)")
+            if not message.content.strip():
+                return
+            await self._reply(message, "🔍 과거 기록 검색·진단 중... (수십 초~수 분 걸릴 수 있어요)")
             async with message.channel.typing():
                 answer = await asyncio.to_thread(diagnose, self.cfg, message.content)
-            await self._send(message.channel, [answer])
+            await self._send(message, [answer.strip() or "(빈 응답)"])
         except Exception as e:
-            await self._send(message.channel, [f"⚠ 오류: {e}"])
+            await self._send(message, [f"⚠ 오류: {e}"])
         finally:
             self.busy.pop(key, None)
+
+
+async def _followup(interaction: discord.Interaction, msg: str) -> None:
+    try:
+        for chunk in split_message(msg):  # 긴 예외 문자열 등 2000자 초과 대비
+            await interaction.followup.send(chunk)
+    except discord.HTTPException:
+        # ponytail: defer 토큰 15분 만료(장시간 /seed·/absorb) 대비 — 채널 전송 폴백
+        for chunk in split_message(msg):
+            await interaction.channel.send(chunk)
 
 
 def _register_commands(bot_: HorcruxBot) -> None:
@@ -549,34 +686,31 @@ def _register_commands(bot_: HorcruxBot) -> None:
                            resolved: bool, cause: str | None = None, note: str = ""):
         await interaction.response.defer()
         try:
-            msg = await asyncio.to_thread(run_feedback, bot_.cfg, record_id, resolved, cause, note)
+            msg = await asyncio.to_thread(_locked, run_feedback, bot_.cfg, record_id, resolved, cause, note)
         except Exception as e:
             msg = f"⚠ 오류: {e}"
-        for chunk in split_message(msg):  # 긴 예외 문자열 등 2000자 초과 대비
-            await interaction.followup.send(chunk)
+        await _followup(interaction, msg)
 
     @bot_.tree.command(name="absorb", description="위키 아티클 편찬 (재시도·수동 실행)")
     async def absorb_cmd(interaction: discord.Interaction):
         await interaction.response.defer()
         try:
-            n = await asyncio.to_thread(run_absorb, bot_.cfg)
+            n = await asyncio.to_thread(_locked, run_absorb, bot_.cfg)  # 락 우회 금지
             msg = f"아티클 갱신: {n}건"
         except Exception as e:
             msg = f"⚠ 오류: {e}"
-        for chunk in split_message(msg):  # 긴 예외 문자열 등 2000자 초과 대비
-            await interaction.followup.send(chunk)
+        await _followup(interaction, msg)
 
     @bot_.tree.command(name="seed", description="합성 데모 데이터 생성")
     @app_commands.describe(n="생성 건수")
     async def seed_cmd(interaction: discord.Interaction, n: int = 6):
         await interaction.response.defer()
         try:
-            saved = await asyncio.to_thread(run_seed, bot_.cfg, n)
+            saved = await asyncio.to_thread(_locked, run_seed, bot_.cfg, n)  # 락 우회 금지
             msg = f"합성 로그 {saved}건 저장 (위키 편찬 포함)"
         except Exception as e:
             msg = f"⚠ 오류: {e}"
-        for chunk in split_message(msg):  # 긴 예외 문자열 등 2000자 초과 대비
-            await interaction.followup.send(chunk)
+        await _followup(interaction, msg)
 
 
 def build_client(cfg: Config) -> HorcruxBot:
@@ -596,7 +730,7 @@ def run_bot(cfg: Config) -> None:
 - [ ] **Step 4: 통과 확인**
 
 Run: `python -m pytest -q --basetemp=.pytest_tmp tests/test_bot.py`
-Expected: PASS 전부 (13개).
+Expected: PASS 전부 (20개).
 
 - [ ] **Step 5: Commit**
 
@@ -718,6 +852,7 @@ horcrux bot
 ```
 
 - `#실험로그`에 자연어 로그를 쓰면 구조화 저장 (부족 정보는 봇이 되물음 — 10분 무응답 시 그대로 저장)
+- 사진 등 첨부는 볼트 `raw/attachments/<레코드id>/`에 저장되고 기록 본문에 링크됨 (이미지 내용 분석은 안 함. 파싱 실패 needs_review 레코드는 폴더에만 저장되고 본문 링크 없음)
 - `#질문`에 문제를 쓰면 과거 사례·위키 기반 진단
 - `/feedback` `/absorb` `/seed` 슬래시 커맨드 지원
 - 랩서버에도 선택한 LLM CLI(claude 등)가 설치·로그인돼 있어야 한다
@@ -739,16 +874,17 @@ git commit -m "docs: 봇 설정·실행 가이드 + 레이어 소유 경계"
 - [ ] **Step 1: 전체 테스트**
 
 Run: `python -m pytest -q --basetemp=.pytest_tmp`
-Expected: 전부 PASS (기존 61 + 신규 ≈15).
+Expected: 전부 PASS (기존 61 + 신규 ≈22).
 
 - [ ] **Step 2: 수동 스모크 (사용자 개입 필요 — 토큰·서버 준비는 README 절차)**
 
 1. `$env:HORCRUX_DISCORD_TOKEN="<토큰>"; horcrux bot` — "봇 로그인" 출력 확인
-2. `#실험로그`에 일부러 빈약한 로그 입력 → "🔬 로그 분석 중" 접수 메시지 → 재질문 확인 → 답변 → "저장됨"(경로 포함) + 위키 갱신 확인
-3. LLM 처리 중 같은 채널에 연속 메시지 → "⏳ 이전 메시지 처리 중" 안내 확인
-4. 매핑 밖 채널(예: #잡담)에 메시지 → 봇 무반응 확인
-5. `#질문`에 문제 입력 → "🔍 검색·진단 중" 접수 메시지 → 사례 인용 답변 확인
-6. `/feedback record_id:<위 id> resolved:True cause:테스트` → "해결로 기록됨" 확인
+2. `#실험로그`에 일부러 빈약한 로그 입력 → "🔬 로그 분석 중" 접수(원 메시지에 답장 형태) → 재질문 → 답변 → **"저장됨"(경로 포함) 즉시 회신 → 잠시 후 "위키 갱신: n건" 후속 메시지** 확인
+3. 사진 첨부한 로그 입력 → 저장 후 볼트 `raw/attachments/<id>/`에 파일 + md 본문 `![[...]]` 링크 확인
+4. LLM 처리 중 같은 채널에 연속 메시지 → "⏳ 이전 메시지 처리 중" 안내 확인
+5. 매핑 밖 채널(예: #잡담)에 메시지 → 봇 무반응 확인
+6. `#질문`에 문제 입력 → "🔍 검색·진단 중" 접수 → 사례 인용 답변 확인
+7. `/feedback record_id:<위 id> resolved:True cause:테스트` → "해결로 기록됨" 확인
 
 - [ ] **Step 3: 브랜치 마무리**
 
