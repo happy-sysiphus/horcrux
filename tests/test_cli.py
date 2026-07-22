@@ -25,3 +25,12 @@ def test_log_chains_absorb(tmp_path, monkeypatch):
     monkeypatch.setattr(absorb_mod, "run_absorb", lambda cfg: called.setdefault("n", 2))
     cli.main(["log"])
     assert called.get("n") == 2
+
+
+def test_cli_bot_dispatch(monkeypatch):
+    called = {}
+    import horcrux.bot as bot_mod
+    monkeypatch.setattr(bot_mod, "run_bot", lambda cfg: called.setdefault("cfg", cfg))
+    from horcrux.cli import main
+    main(["bot"])
+    assert "cfg" in called

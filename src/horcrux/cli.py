@@ -30,6 +30,7 @@ def main(argv: list[str] | None = None) -> None:
     fb.add_argument("--note", default="")
     sd = sub.add_parser("seed", help="합성 데모 데이터 생성")
     sd.add_argument("-n", type=int, default=6)
+    sub.add_parser("bot", help="디스코드 봇 실행")
     args = p.parse_args(argv)
     cfg = load_config()
 
@@ -55,6 +56,9 @@ def main(argv: list[str] | None = None) -> None:
     elif args.cmd == "seed":
         from .seed import run_seed
         run_seed(cfg, args.n)
+    elif args.cmd == "bot":
+        from . import bot
+        bot.run_bot(cfg)
 
 
 if __name__ == "__main__":
