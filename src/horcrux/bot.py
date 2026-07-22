@@ -142,8 +142,8 @@ class HorcruxBot(discord.Client):
     def __init__(self, cfg: Config, **kwargs):
         super().__init__(**kwargs)
         self.cfg = cfg
-        self.log_channel = os.environ.get("HORCRUX_LOG_CHANNEL", "실험로그")
-        self.ask_channel = os.environ.get("HORCRUX_ASK_CHANNEL", "질문")
+        self.log_channel = cfg.log_channel
+        self.ask_channel = cfg.ask_channel
         # (channel_id, user_id) → "processing"(LLM 처리 중) | "waiting"(재질문 답변 대기)
         self.busy: dict[tuple[int, int], str] = {}
         self._claimed: set[int] = set()  # wait_for가 소비할 메시지 id — on_message 오탐 방지
@@ -320,8 +320,7 @@ def build_client(cfg: Config) -> HorcruxBot:
 
 
 def run_bot(cfg: Config) -> None:
-    token = os.environ.get("HORCRUX_DISCORD_TOKEN")
-    if not token:
+    if not cfg.discord_token:
         raise RuntimeError(
-            "HORCRUX_DISCORD_TOKEN 미설정 — Discord 개발자 포털에서 봇 토큰을 발급해 환경변수로 넣어주세요")
-    build_client(cfg).run(token)
+            "봇 토큰 미설정 — 'horcrux init'으로 설정하거나 HORCRUX_DISCORD_TOKEN 환경변수를 넣어주세요")
+    build_client(cfg).run(cfg.discord_token)

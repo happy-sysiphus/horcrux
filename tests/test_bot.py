@@ -227,3 +227,8 @@ def test_run_bot_without_token_raises(monkeypatch, tmp_path):
     monkeypatch.delenv("HORCRUX_DISCORD_TOKEN", raising=False)
     with pytest.raises(RuntimeError, match="HORCRUX_DISCORD_TOKEN"):
         bot.run_bot(cfg(tmp_path))
+
+
+def test_build_client_channels_from_cfg(tmp_path):
+    c = bot.build_client(Config(vault=tmp_path, log_channel="lab-log", ask_channel="lab-ask"))
+    assert (c.log_channel, c.ask_channel) == ("lab-log", "lab-ask")
