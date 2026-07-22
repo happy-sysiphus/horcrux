@@ -182,3 +182,17 @@ def test_absorb_after_failure_warns(monkeypatch, tmp_path):
         raise RuntimeError("편찬 실패")
     monkeypatch.setattr(bot, "run_absorb", boom)
     assert "위키 편찬 실패" in absorb_after(cfg(tmp_path))[0]
+
+
+# --- 디스코드 글루 (오프라인 구성 검증) ---
+
+def test_build_client_registers_commands(tmp_path):
+    c = bot.build_client(cfg(tmp_path))
+    assert {cmd.name for cmd in c.tree.get_commands()} == {"feedback", "absorb", "seed"}
+    assert c.intents.message_content is True
+
+
+def test_run_bot_without_token_raises(monkeypatch, tmp_path):
+    monkeypatch.delenv("HORCRUX_DISCORD_TOKEN", raising=False)
+    with pytest.raises(RuntimeError, match="HORCRUX_DISCORD_TOKEN"):
+        bot.run_bot(cfg(tmp_path))

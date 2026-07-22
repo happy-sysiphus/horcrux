@@ -1,15 +1,22 @@
 from __future__ import annotations
 
+import asyncio
 import os
 import threading
 from dataclasses import dataclass, field
 from datetime import date as _date
 from pathlib import Path
 
+import discord
+from discord import app_commands
+
 from .absorb import run_absorb
-from .config import Config, VaultConfig
+from .config import Config, VaultConfig, load_vault_config
+from .diagnose import diagnose
+from .feedback import run_feedback
 from .ingest import ParsedLog, missing_required, parse_log, save_unparsed, to_record
 from .records import save_record
+from .seed import run_seed
 
 MAX_ROUNDS = 3       # 재질문 최대 횟수
 REPLY_TIMEOUT = 600  # 재질문 응답 대기 (초)
@@ -117,3 +124,192 @@ def absorb_after(cfg: Config) -> list[str]:
         return [f"위키 갱신: {n}건"] if n else []
     except Exception as e:
         return [f"(위키 편찬 실패 — /absorb로 재시도: {e})"]
+
+
+class HorcruxBot(discord.Client):
+    def __init__(self, cfg: Config, **kwargs):
+        super().__init__(**kwargs)
+        self.cfg = cfg
+        self.log_channel = os.environ.get("HORCRUX_LOG_CHANNEL", "실험로그")
+        self.ask_channel = os.environ.get("HORCRUX_ASK_CHANNEL", "질문")
+        # (channel_id, user_id) → "processing"(LLM 처리 중) | "waiting"(재질문 답변 대기)
+        self.busy: dict[tuple[int, int], str] = {}
+        self._claimed: set[int] = set()  # wait_for가 소비할 메시지 id — on_message 오탐 방지
+        self._synced = False
+        self.tree = app_commands.CommandTree(self)
+        _register_commands(self)
+
+    async def on_ready(self):
+        # 개발 중엔 guild-scoped sync가 즉시 반영 (글로벌은 전파 지연).
+        # on_ready는 재연결마다 다시 불림 — sync 반복은 rate limit 위험이라 1회 가드.
+        if not self._synced:
+            for g in self.guilds:
+                self.tree.copy_global_to(guild=g)
+                await self.tree.sync(guild=g)
+            self._synced = True
+        print(f"봇 로그인: {self.user} / 채널 매핑: #{self.log_channel}(log) #{self.ask_channel}(ask)")
+
+    async def on_message(self, message: discord.Message):
+        if message.author.bot:
+            return
+        if message.id in self._claimed:
+            # wait_for가 소비한 재질문 답변 — dispatch가 wait_for future를 먼저 깨우므로
+            # (Python 3.12+에선 _log_flow가 먼저 재개됨) busy 상태만으론 오탐이 남
+            self._claimed.discard(message.id)
+            return
+        key = (message.channel.id, message.author.id)
+        state = self.busy.get(key)
+        if state == "waiting":
+            return  # 대기 중 경합 백스톱
+        if state == "processing":
+            # LLM 처리 중엔 대기 리스너가 없음 — 무통보 유실 대신 안내
+            await self._reply(message, "⏳ 이전 메시지 처리 중 — 끝나면 다시 보내주세요.")
+            return
+        kind = route(getattr(message.channel, "name", None), self.log_channel, self.ask_channel)
+        if kind == "log":
+            await self._log_flow(message)
+        elif kind == "ask":
+            await self._ask_flow(message)
+
+    @staticmethod
+    async def _reply(message: discord.Message, text: str) -> None:
+        # 원 메시지가 삭제됐으면 reply가 400 (Unknown message) — 채널 전송으로 폴백
+        try:
+            await message.reply(text)
+        except discord.HTTPException:
+            await message.channel.send(text)
+
+    async def _send(self, message: discord.Message, msgs: list[str]) -> None:
+        # 첫 청크는 원 메시지에 답장(reply) — 다중 유저 채널 귀속 명확 + 작성자 알림
+        first = True
+        for m in msgs:
+            for chunk in split_message(m):
+                if first:
+                    await self._reply(message, chunk)
+                    first = False
+                else:
+                    await message.channel.send(chunk)
+
+    @staticmethod
+    async def _read_files(message: discord.Message) -> list[tuple[str, bytes]]:
+        return [(a.filename, await a.read()) for a in message.attachments]
+
+    async def _log_flow(self, message: discord.Message) -> None:
+        key = (message.channel.id, message.author.id)
+        self.busy[key] = "processing"
+        try:
+            if not message.content.strip():
+                await self._reply(message, "첨부만으론 기록할 수 없어요 — 텍스트 로그와 함께 보내주세요.")
+                return
+            # LLM 완료까지 진행률 신호가 없으므로 접수 확인이 유일한 체감 장치
+            await self._reply(message, "🔬 로그 분석 중... (수십 초~수 분 걸릴 수 있어요)")
+            vcfg = load_vault_config(self.cfg.vault)
+            files = await self._read_files(message)
+            async with message.channel.typing():
+                session, msgs = await asyncio.to_thread(
+                    advance_log, self.cfg, vcfg, None, message.content, files)
+            await self._send(message, msgs)
+            while session:
+                def check(m, _a=message.author, _c=message.channel):
+                    ok = m.author == _a and m.channel == _c
+                    if ok:
+                        self._claimed.add(m.id)  # dispatch 시점(동기)에 선점 — on_message 오탐 방지
+                    return ok
+                self.busy[key] = "waiting"
+                try:
+                    reply = await self.wait_for("message", check=check, timeout=REPLY_TIMEOUT)
+                    self.busy[key] = "processing"
+                    await self._reply(reply, "🔬 답변 반영 중...")
+                    rfiles = await self._read_files(reply)
+                    async with message.channel.typing():
+                        session, msgs = await asyncio.to_thread(
+                            advance_log, self.cfg, vcfg, session, reply.content, rfiles)
+                except asyncio.TimeoutError:
+                    self.busy[key] = "processing"
+                    await self._reply(message, "⏱ 응답이 없어 있는 정보로 저장합니다...")
+                    session, msgs = None, await asyncio.to_thread(
+                        finalize_log, self.cfg, vcfg, session)
+                await self._send(message, msgs)
+            # 저장 확인과 분리된 후속 위키 편찬 (0건이면 조용히 생략)
+            wiki_msgs = await asyncio.to_thread(absorb_after, self.cfg)
+            await self._send(message, wiki_msgs)
+        except Exception as e:
+            await self._send(message, [f"⚠ 오류: {e}"])
+        finally:
+            self.busy.pop(key, None)
+
+    async def _ask_flow(self, message: discord.Message) -> None:
+        key = (message.channel.id, message.author.id)
+        self.busy[key] = "processing"
+        try:
+            if message.attachments:
+                await self._reply(message, "(첨부는 진단 분석에 사용되지 않아요 — 텍스트만 참고합니다)")
+            if not message.content.strip():
+                return
+            await self._reply(message, "🔍 과거 기록 검색·진단 중... (수십 초~수 분 걸릴 수 있어요)")
+            async with message.channel.typing():
+                answer = await asyncio.to_thread(diagnose, self.cfg, message.content)
+            await self._send(message, [answer.strip() or "(빈 응답)"])
+        except Exception as e:
+            await self._send(message, [f"⚠ 오류: {e}"])
+        finally:
+            self.busy.pop(key, None)
+
+
+async def _followup(interaction: discord.Interaction, msg: str) -> None:
+    try:
+        for chunk in split_message(msg):  # 긴 예외 문자열 등 2000자 초과 대비
+            await interaction.followup.send(chunk)
+    except discord.HTTPException:
+        # ponytail: defer 토큰 15분 만료(장시간 /seed·/absorb) 대비 — 채널 전송 폴백
+        for chunk in split_message(msg):
+            await interaction.channel.send(chunk)
+
+
+def _register_commands(bot_: HorcruxBot) -> None:
+    @bot_.tree.command(name="feedback", description="레코드 해결 여부·실제 원인 기록")
+    @app_commands.describe(record_id="레코드 id", resolved="해결 여부",
+                           cause="확인된 실제 원인", note="메모")
+    async def feedback_cmd(interaction: discord.Interaction, record_id: str,
+                           resolved: bool, cause: str | None = None, note: str = ""):
+        await interaction.response.defer()
+        try:
+            msg = await asyncio.to_thread(_locked, run_feedback, bot_.cfg, record_id, resolved, cause, note)
+        except Exception as e:
+            msg = f"⚠ 오류: {e}"
+        await _followup(interaction, msg)
+
+    @bot_.tree.command(name="absorb", description="위키 아티클 편찬 (재시도·수동 실행)")
+    async def absorb_cmd(interaction: discord.Interaction):
+        await interaction.response.defer()
+        try:
+            n = await asyncio.to_thread(_locked, run_absorb, bot_.cfg)  # 락 우회 금지
+            msg = f"아티클 갱신: {n}건"
+        except Exception as e:
+            msg = f"⚠ 오류: {e}"
+        await _followup(interaction, msg)
+
+    @bot_.tree.command(name="seed", description="합성 데모 데이터 생성")
+    @app_commands.describe(n="생성 건수")
+    async def seed_cmd(interaction: discord.Interaction, n: int = 6):
+        await interaction.response.defer()
+        try:
+            saved = await asyncio.to_thread(_locked, run_seed, bot_.cfg, n)  # 락 우회 금지
+            msg = f"합성 로그 {saved}건 저장 (위키 편찬 포함)"
+        except Exception as e:
+            msg = f"⚠ 오류: {e}"
+        await _followup(interaction, msg)
+
+
+def build_client(cfg: Config) -> HorcruxBot:
+    intents = discord.Intents.default()
+    intents.message_content = True  # privileged — 개발자 포털에서도 켜야 함
+    return HorcruxBot(cfg, intents=intents)
+
+
+def run_bot(cfg: Config) -> None:
+    token = os.environ.get("HORCRUX_DISCORD_TOKEN")
+    if not token:
+        raise RuntimeError(
+            "HORCRUX_DISCORD_TOKEN 미설정 — Discord 개발자 포털에서 봇 토큰을 발급해 환경변수로 넣어주세요")
+    build_client(cfg).run(token)
