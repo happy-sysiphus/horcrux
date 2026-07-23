@@ -37,6 +37,16 @@ def test_cli_bot_dispatch(monkeypatch):
     assert "cfg" in called
 
 
+def test_cli_bot_without_token_exits_clean(monkeypatch, isolated_config, capsys):
+    monkeypatch.setattr("builtins.input", lambda prompt="": "")
+    from horcrux.cli import main
+    with pytest.raises(SystemExit) as ei:
+        main(["bot"])
+    assert ei.value.code == 1
+    err = capsys.readouterr().err
+    assert "토큰" in err   # 깔끔한 메시지, 트레이스백 아님
+
+
 def test_cli_init_writes_config(monkeypatch, isolated_config):
     answers = iter(["tok-1", "C:/lab/vault", "gemini", "", "lab-log", ""])
     monkeypatch.setattr("builtins.input", lambda prompt="": next(answers))

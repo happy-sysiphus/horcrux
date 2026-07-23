@@ -61,31 +61,35 @@ def main(argv: list[str] | None = None) -> None:
         return
     cfg = load_config()
 
-    if args.cmd == "log":
-        path = run_log(cfg)
-        if path:
+    try:
+        if args.cmd == "log":
+            path = run_log(cfg)
+            if path:
+                from .absorb import run_absorb
+                try:
+                    n = run_absorb(cfg)
+                    print(f"위키 갱신: {n}건")
+                except Exception as e:
+                    print(f"(위키 편찬 실패 — 'horcrux absorb'로 재시도: {e})")
+        elif args.cmd == "ask":
+            from .diagnose import run_ask
+            run_ask(cfg)
+        elif args.cmd == "feedback":
+            from .feedback import run_feedback
+            print(run_feedback(cfg, args.record_id, args.resolved == "y", args.cause, args.note))
+        elif args.cmd == "absorb":
             from .absorb import run_absorb
-            try:
-                n = run_absorb(cfg)
-                print(f"위키 갱신: {n}건")
-            except Exception as e:
-                print(f"(위키 편찬 실패 — 'horcrux absorb'로 재시도: {e})")
-    elif args.cmd == "ask":
-        from .diagnose import run_ask
-        run_ask(cfg)
-    elif args.cmd == "feedback":
-        from .feedback import run_feedback
-        print(run_feedback(cfg, args.record_id, args.resolved == "y", args.cause, args.note))
-    elif args.cmd == "absorb":
-        from .absorb import run_absorb
-        n = run_absorb(cfg)
-        print(f"아티클 갱신: {n}건")
-    elif args.cmd == "seed":
-        from .seed import run_seed
-        run_seed(cfg, args.n)
-    elif args.cmd == "bot":
-        from . import bot
-        bot.run_bot(cfg)
+            n = run_absorb(cfg)
+            print(f"아티클 갱신: {n}건")
+        elif args.cmd == "seed":
+            from .seed import run_seed
+            run_seed(cfg, args.n)
+        elif args.cmd == "bot":
+            from . import bot
+            bot.run_bot(cfg)
+    except RuntimeError as e:
+        print(e, file=sys.stderr)
+        sys.exit(1)
 
 
 if __name__ == "__main__":
