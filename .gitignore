@@ -3,3 +3,6 @@ __pycache__/
 .pytest_cache/
 .pytest_tmp/
 .superpowers/
+dist/
+build/
+horcrux.spec
