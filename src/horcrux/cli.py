@@ -7,6 +7,29 @@ from .config import load_config
 from .ingest import run_log
 
 
+def run_init() -> None:
+    from .config import load_config, save_config
+    cur = load_config()  # 기존 파일+env 반영값을 기본값으로 보여줌
+    print("Horcrux 설정 — 빈 입력은 [현재값] 유지")
+
+    def ask(label: str, cur_val) -> str:
+        raw = input(f"{label} [{cur_val or ''}]: ").strip()
+        return raw or (str(cur_val) if cur_val else "")
+
+    token = ask("디스코드 봇 토큰", cur.discord_token)
+    vault = ask("볼트 절대경로", cur.vault.as_posix())
+    provider = ask("LLM provider (claude/gemini/codex)", cur.provider)
+    model = ask("모델 (빈 값 = CLI 기본)", cur.model)
+    log_ch = ask("log 채널 이름", cur.log_channel)
+    ask_ch = ask("ask 채널 이름", cur.ask_channel)
+    path = save_config({
+        "discord_token": token or None, "vault": vault, "provider": provider,
+        "model": model or None, "log_channel": log_ch, "ask_channel": ask_ch,
+    })
+    print(f"저장됨: {path}")
+    print("다음: 'horcrux bot' 실행 (LLM CLI 로그인·봇 서버 초대는 README 참조)")
+
+
 def _utf8_console():
     for stream in (sys.stdout, sys.stdin, sys.stderr):
         try:
@@ -31,7 +54,11 @@ def main(argv: list[str] | None = None) -> None:
     sd = sub.add_parser("seed", help="합성 데모 데이터 생성")
     sd.add_argument("-n", type=int, default=6)
     sub.add_parser("bot", help="디스코드 봇 실행")
+    sub.add_parser("init", help="설정 마법사 (~/.horcrux/config.yaml 생성)")
     args = p.parse_args(argv)
+    if args.cmd == "init":
+        run_init()  # cfg 로드 전 분기 — 깨진 설정파일도 init으로 복구 가능해야 함
+        return
     cfg = load_config()
 
     if args.cmd == "log":
