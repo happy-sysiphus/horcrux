@@ -12,6 +12,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = ["pytest"]
 release = ["build", "pyinstaller"]
+web = ["fastapi", "uvicorn"]
 
 [project.scripts]
 horcrux = "horcrux.cli:main"

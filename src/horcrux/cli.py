@@ -54,6 +54,9 @@ def main(argv: list[str] | None = None) -> None:
     sd = sub.add_parser("seed", help="합성 데모 데이터 생성")
     sd.add_argument("-n", type=int, default=6)
     sub.add_parser("bot", help="디스코드 봇 실행")
+    sv = sub.add_parser("serve", help="웹 UI 서버 (LAB GENE)")
+    sv.add_argument("--host", default="127.0.0.1")
+    sv.add_argument("--port", type=int, default=8765)
     sub.add_parser("init", help="설정 마법사 (~/.horcrux/config.yaml 생성)")
     args = p.parse_args(argv)
     if args.cmd == "init":
@@ -87,6 +90,9 @@ def main(argv: list[str] | None = None) -> None:
         elif args.cmd == "bot":
             from . import bot
             bot.run_bot(cfg)
+        elif args.cmd == "serve":
+            from .server import run_serve
+            run_serve(cfg, args.host, args.port)
     except RuntimeError as e:
         print(e, file=sys.stderr)
         sys.exit(1)
