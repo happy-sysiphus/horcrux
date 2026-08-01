@@ -1,6 +1,6 @@
 from horcrux.records import (
     ExperimentRecord, Parameter, Resolution, SuspectedCause, Symptom,
-    list_records, load_record, make_record_id, save_record, update_resolution,
+    list_records, load_record, make_record_id, record_path, save_record, update_resolution,
 )
 
 
@@ -61,3 +61,11 @@ def test_roundtrip_with_dashes_in_values(tmp_path):
     loaded, body = load_record(path)
     assert loaded == rec
     assert "---" in body
+
+
+def test_followup_of_roundtrip(tmp_path):
+    rec = ExperimentRecord(id="2026-08-01_x-001", date="2026-08-01",
+                           followup_of="2026-07-31_x-001")
+    save_record(tmp_path, rec, "원문", "요약")
+    loaded, _ = load_record(record_path(tmp_path, rec.id))
+    assert loaded.followup_of == "2026-07-31_x-001"

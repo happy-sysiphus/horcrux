@@ -43,6 +43,7 @@ class ExperimentRecord(BaseModel):
     suspected_causes: list[SuspectedCause] = Field(default_factory=list)
     actions_taken: list[str] = Field(default_factory=list)
     resolution: Resolution = Field(default_factory=Resolution)
+    followup_of: str | None = None  # 후속 실험이면 기준 레코드 id
     needs_review: bool = False
 
 

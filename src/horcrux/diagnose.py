@@ -5,6 +5,7 @@ from pathlib import Path
 from .config import Config
 from .ingest import read_multiline
 from .llm import generate
+from .records import load_record
 from .retrieval import retrieve
 
 ANSWER_SYSTEM = """당신은 연구실의 과거 실험 기록을 근거로 문제 진단을 보조하는 조수다.
@@ -15,7 +16,7 @@ ANSWER_SYSTEM = """당신은 연구실의 과거 실험 기록을 근거로 문�
 컨텍스트에 없는 사례를 지어내지 마라. 사례가 없다고 표시된 경우, 일반 지식 기반 조언임을 명확히 밝혀라."""
 
 
-def diagnose(cfg: Config, text: str) -> str:
+def diagnose_data(cfg: Config, text: str) -> dict:
     res = retrieve(cfg, text)
     cases = "\n\n".join(
         f"### 사례 {r['id']}\n" + Path(r["path"]).read_text(encoding="utf-8")
@@ -28,8 +29,29 @@ def diagnose(cfg: Config, text: str) -> str:
     user = f"## 질의\n{text}\n\n## 유사 사례\n{cases}\n\n## 위키 아티클\n{wiki}"
     answer = generate(cfg, ANSWER_SYSTEM, user)
     if not res["records"] and not res["wiki"]:
-        answer = "⚠ 아직 축적된 유사 사례가 없습니다. 아래는 일반 지식 기반 조언입니다.\n\n" + answer
+        evidence = "none"
     elif not res["records"]:
+        evidence = "wiki"
+    else:
+        evidence = "records"
+    records_meta = []
+    for r in res["records"]:
+        rec, _ = load_record(Path(r["path"]))
+        records_meta.append({
+            "id": rec.id, "date": rec.date, "experiment_type": rec.experiment_type,
+            "objective": rec.objective, "symptom": rec.symptom.model_dump(),
+            "resolution": rec.resolution.model_dump(),
+        })
+    return {"answer": answer, "evidence": evidence,
+            "records": records_meta, "wiki": [w["id"] for w in res["wiki"]]}
+
+
+def diagnose(cfg: Config, text: str) -> str:
+    d = diagnose_data(cfg, text)
+    answer = d["answer"]
+    if d["evidence"] == "none":
+        answer = "⚠ 아직 축적된 유사 사례가 없습니다. 아래는 일반 지식 기반 조언입니다.\n\n" + answer
+    elif d["evidence"] == "wiki":
         answer = "ℹ 직접 유사한 실험 레코드는 없어, 아래는 연구실 위키 아티클 기반 조언입니다.\n\n" + answer
     return answer
 

@@ -56,3 +56,17 @@ def test_wiki_only_labelled_wiki_based(tmp_path, monkeypatch):
     out = dg.diagnose(Config(vault=tmp_path), "질문")
     assert "위키 아티클 기반" in out
     assert "일반 지식" not in out
+
+
+def test_diagnose_data_shape(tmp_path, monkeypatch):
+    from horcrux.records import ExperimentRecord, save_record, record_path
+
+    rec = ExperimentRecord(id="2026-08-01_exp-001", date="2026-08-01", experiment_type="증착")
+    save_record(tmp_path, rec, "원문", "요약")
+    monkeypatch.setattr(dg, "retrieve", lambda cfg, q, **kw: {
+        "records": [{"id": rec.id, "path": str(record_path(tmp_path, rec.id))}], "wiki": []})
+    monkeypatch.setattr(dg, "generate", lambda cfg, s, u: "답변")
+    d = dg.diagnose_data(Config(vault=tmp_path), "질문")
+    assert d["evidence"] == "records"
+    assert d["records"][0]["id"] == rec.id
+    assert d["answer"] == "답변"
