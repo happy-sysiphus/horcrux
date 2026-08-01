@@ -4,6 +4,7 @@ import { api } from "../api";
 import FeedbackModal from "../components/FeedbackModal";
 import { resolutionLabel } from "../components/RecordCard";
 import { newSession, saveSession } from "../store";
+import { symptomCategoryLabels } from "../types";
 import type { RecordDetail, RecordMeta } from "../types";
 
 export default function Notes() {
@@ -85,7 +86,7 @@ export default function Notes() {
             <div className="mt-5 grid grid-cols-4 gap-3 rounded-xl bg-slate-100 p-4 text-sm">
               <div><div className="text-xs text-slate-400">장비</div>{detail.record.equipment.join(", ") || "-"}</div>
               <div><div className="text-xs text-slate-400">재료</div>{detail.record.materials.join(", ") || "-"}</div>
-              <div><div className="text-xs text-slate-400">증상</div>{detail.record.symptom.category === "none" ? "문제 없음" : detail.record.symptom.category}</div>
+              <div><div className="text-xs text-slate-400">증상</div>{symptomCategoryLabels[detail.record.symptom.category]}</div>
               <div><div className="text-xs text-slate-400">해결</div>{resolutionLabel(detail.record).text}</div>
             </div>
             {detail.record.parameters.length > 0 && (

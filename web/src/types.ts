@@ -3,6 +3,12 @@ export interface Symptom {
   category: "low_value" | "unstable" | "abnormal" | "none";
   description: string;
 }
+export const symptomCategoryLabels: Record<Symptom["category"], string> = {
+  none: "문제 없음",
+  low_value: "값이 낮음",
+  unstable: "불안정·재현성",
+  abnormal: "비정상 거동",
+};
 export interface SuspectedCause {
   cause: string;
   status: "unconfirmed" | "confirmed" | "rejected";

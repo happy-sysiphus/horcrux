@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { api } from "../api";
 import { getSession, saveSession } from "../store";
+import { symptomCategoryLabels } from "../types";
 import type { ParsedLog, RecordDetail } from "../types";
 
 function Field({ label, value, onChange, onBlur, rows = 1 }: {
@@ -120,10 +121,9 @@ export default function Preview() {
             <select value={p.symptom.category}
               onChange={(e) => set({ symptom: { ...p.symptom, category: e.target.value as ParsedLog["symptom"]["category"] } })}
               className="mt-1 w-full rounded border border-slate-200 px-2 py-1.5 text-sm font-medium">
-              <option value="none">문제 없음</option>
-              <option value="low_value">값이 낮음</option>
-              <option value="unstable">불안정·재현성</option>
-              <option value="abnormal">비정상 거동</option>
+              {Object.entries(symptomCategoryLabels).map(([value, label]) => (
+                <option key={value} value={value}>{label}</option>
+              ))}
             </select>
           </label>
           <Field label="증상 설명" value={p.symptom.description} rows={2}

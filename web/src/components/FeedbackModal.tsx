@@ -5,7 +5,7 @@ import type { RecordDetail } from "../types";
 export default function FeedbackModal({ detail, onClose, onDone }: {
   detail: RecordDetail; onClose: () => void; onDone: () => void;
 }) {
-  const [resolved, setResolved] = useState(true);
+  const [resolved, setResolved] = useState(detail.record.resolution.resolved);
   const [cause, setCause] = useState(detail.record.resolution.actual_cause ?? "");
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
@@ -15,7 +15,7 @@ export default function FeedbackModal({ detail, onClose, onDone }: {
     setBusy(true);
     setError(null);
     try {
-      await api.feedback(detail.record.id, resolved, cause.trim() || undefined, note);
+      await api.feedback(detail.record.id, resolved, resolved ? (cause.trim() || undefined) : undefined, note);
       onDone();
     } catch (e) {
       setError((e as Error).message);
