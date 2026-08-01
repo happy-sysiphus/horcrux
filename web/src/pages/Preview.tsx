@@ -23,6 +23,27 @@ function parseParameters(text: string): ParsedLog["parameters"] {
   });
 }
 
+const csv = {
+  serialize: (v: string[]) => v.join(", "),
+  parse: (text: string) => text.split(",").map((x) => x.trim()).filter(Boolean),
+};
+
+// 쉼표 구분 텍스트 필드 공통 컴포넌트. typing 중 매 keystroke마다 파싱하면 "=" 없는(또는
+// 아직 비어 있는) 중간 세그먼트가 즉시 버려져 기존 값이 뭉개진다. 그래서 draft는 로컬로만
+// 들고, blur 시점에만 parse+onCommit으로 실제 값에 반영한다.
+function DraftField<T>({ label, value, serialize, parse, onCommit, rows = 1 }: {
+  label: string; value: T; serialize: (v: T) => string; parse: (text: string) => T;
+  onCommit: (v: T) => void; rows?: number;
+}) {
+  const [draft, setDraft] = useState(() => serialize(value));
+  // 다른 필드 편집 등 외부 요인으로 value의 참조가 바뀌면 draft를 재동기화한다.
+  useEffect(() => setDraft(serialize(value)), [value]);
+  return (
+    <Field label={label} value={draft} rows={rows} onChange={setDraft}
+      onBlur={() => onCommit(parse(draft))} />
+  );
+}
+
 export default function Preview() {
   const { sid } = useParams();
   const nav = useNavigate();
@@ -34,19 +55,10 @@ export default function Preview() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [savedId, setSavedId] = useState<string | null>(null);  // 저장 성공 후 재시도 시 중복 생성 방지
-  // 공정변수는 typing 중 매 keystroke마다 파싱하면 "=" 없는 중간 세그먼트(예: 콤마 직후)가
-  // 즉시 버려져 기존 값이 오염된다. 그래서 draft는 로컬로만 들고, blur 시점에만 p.parameters에 반영한다.
-  const [paramsDraft, setParamsDraft] = useState(
-    () => (p?.parameters ?? []).map((x) => `${x.name}=${x.value}`).join(", "));
 
   useEffect(() => {
     if (session?.baseId) api.getRecord(session.baseId).then(setBase).catch(() => {});
   }, [session?.baseId]);
-
-  // 다른 필드 편집 등 외부 요인으로 p.parameters가 바뀌면 draft를 최신 상태로 재동기화한다.
-  useEffect(() => {
-    setParamsDraft((p?.parameters ?? []).map((x) => `${x.name}=${x.value}`).join(", "));
-  }, [p?.parameters]);
 
   if (!session || !p) return <div className="p-8 text-slate-500">미리볼 파싱 결과가 없습니다.</div>;
   if (session.saved && !savedId)
@@ -91,17 +103,17 @@ export default function Preview() {
           <div className="font-semibold">기본 정보</div>
           <Field label="실험 유형" value={p.experiment_type} onChange={(v) => set({ experiment_type: v })} />
           <Field label="실험 목적" value={p.objective} onChange={(v) => set({ objective: v })} />
-          <Field label="장비 (쉼표 구분)" value={p.equipment.join(", ")}
-            onChange={(v) => set({ equipment: v.split(",").map((x) => x.trim()).filter(Boolean) })} />
-          <Field label="재료 (쉼표 구분)" value={p.materials.join(", ")}
-            onChange={(v) => set({ materials: v.split(",").map((x) => x.trim()).filter(Boolean) })} />
+          <DraftField label="장비 (쉼표 구분)" value={p.equipment} serialize={csv.serialize} parse={csv.parse}
+            onCommit={(equipment) => set({ equipment })} />
+          <DraftField label="재료 (쉼표 구분)" value={p.materials} serialize={csv.serialize} parse={csv.parse}
+            onCommit={(materials) => set({ materials })} />
         </div>
         <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-5">
           <div className="font-semibold">조건·결과</div>
-          <Field label="공정변수 (이름=값, 쉼표 구분)"
-            value={paramsDraft}
-            onChange={setParamsDraft}
-            onBlur={() => set({ parameters: parseParameters(paramsDraft) })} />
+          <DraftField label="공정변수 (이름=값, 쉼표 구분)" value={p.parameters}
+            serialize={(v) => v.map((x) => `${x.name}=${x.value}`).join(", ")}
+            parse={parseParameters}
+            onCommit={(parameters) => set({ parameters })} />
           <Field label="결과" value={p.results} rows={2} onChange={(v) => set({ results: v })} />
           <label className="block">
             <div className="text-xs text-slate-400">증상 분류</div>
@@ -116,14 +128,12 @@ export default function Preview() {
           </label>
           <Field label="증상 설명" value={p.symptom.description} rows={2}
             onChange={(v) => set({ symptom: { ...p.symptom, description: v } })} />
-          <Field label="조치 (쉼표 구분)" value={p.actions_taken.join(", ")}
-            onChange={(v) => set({ actions_taken: v.split(",").map((x) => x.trim()).filter(Boolean) })} />
-          <Field label="원인 후보 (쉼표 구분 — 피드백 시 확정 원인 선택지가 됨)"
-            value={p.suspected_causes.map((c) => c.cause).join(", ")}
-            onChange={(v) => set({
-              suspected_causes: v.split(",").map((x) => x.trim()).filter(Boolean)
-                .map((cause) => ({ cause, status: "unconfirmed" as const })),
-            })} />
+          <DraftField label="조치 (쉼표 구분)" value={p.actions_taken} serialize={csv.serialize} parse={csv.parse}
+            onCommit={(actions_taken) => set({ actions_taken })} />
+          <DraftField label="원인 후보 (쉼표 구분 — 피드백 시 확정 원인 선택지가 됨)" value={p.suspected_causes}
+            serialize={(v) => v.map((c) => c.cause).join(", ")}
+            parse={(text) => csv.parse(text).map((cause) => ({ cause, status: "unconfirmed" as const }))}
+            onCommit={(suspected_causes) => set({ suspected_causes })} />
         </div>
       </div>
 
