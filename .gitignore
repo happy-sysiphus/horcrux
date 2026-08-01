@@ -6,3 +6,6 @@ __pycache__/
 dist/
 build/
 horcrux.spec
+web/node_modules/
+web/dist/
+web/*.tsbuildinfo
