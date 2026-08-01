@@ -7,7 +7,8 @@ export default function FeedbackModal({ detail, onClose, onDone }: {
 }) {
   const [resolved, setResolved] = useState(detail.record.resolution.resolved);
   const [cause, setCause] = useState(detail.record.resolution.actual_cause ?? "");
-  const [note, setNote] = useState("");
+  // 백엔드 update_resolution이 Resolution을 통째로 교체하므로 기존 메모로 초기화해야 덮어써도 안 지워진다
+  const [note, setNote] = useState(detail.record.resolution.note);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

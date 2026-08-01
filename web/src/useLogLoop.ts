@@ -95,12 +95,17 @@ export function useLogLoop(sid: string | undefined) {
     await runParse(s);
   }
 
+  // 데이터 유실 방지 최후 경로 — 실패를 조용히 삼키면 사용자는 저장된 줄 안다
   async function onSaveRaw() {
     const s = session!;
-    const { id } = await api.saveRaw(s.rawText);
-    s.saved = true;
-    update(s);
-    nav(`/notes/${id}`);
+    try {
+      const { id } = await api.saveRaw(s.rawText);
+      s.saved = true;
+      update(s);
+      nav(`/notes/${id}`);
+    } catch (e) {
+      setError(`원문 저장 실패 — ${(e as Error).message}`);
+    }
   }
 
   // 질문 루프를 끝냈거나 재질문 라운드를 소진해야 저장 진입 (스펙 ②)

@@ -85,7 +85,8 @@ export default function Preview() {
         saveSession(session!);
       }
       if (updateBase && session!.baseId && baseCause.trim())
-        await api.feedback(session!.baseId, true, baseCause.trim());
+        // note를 안 넘기면 백엔드가 Resolution을 통째로 교체하며 기존 메모를 지운다
+        await api.feedback(session!.baseId, true, baseCause.trim(), base?.record.resolution.note);
       nav(`/notes/${id}`);
     } catch (e) {
       setError((e as Error).message);
