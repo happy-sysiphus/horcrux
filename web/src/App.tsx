@@ -2,6 +2,7 @@ import { HashRouter, Route, Routes } from "react-router-dom";
 import Sidebar from "./components/Sidebar";
 import Home from "./pages/Home";
 import LogChat from "./pages/LogChat";
+import Preview from "./pages/Preview";
 
 function Placeholder({ name }: { name: string }) {
   return <div className="p-8 text-slate-500">{name}</div>;
@@ -17,7 +18,7 @@ export default function App() {
             <Route path="/" element={<Home />} />
             <Route path="/log/:sid" element={<LogChat />} />
             <Route path="/ask/:sid" element={<Placeholder name="질문" />} />
-            <Route path="/preview/:sid" element={<Placeholder name="미리보기" />} />
+            <Route path="/preview/:sid" element={<Preview />} />
             <Route path="/notes" element={<Placeholder name="연구노트" />} />
             <Route path="/notes/:id" element={<Placeholder name="연구노트" />} />
             <Route path="/followup/:sid" element={<Placeholder name="후속 실험" />} />
