@@ -1,5 +1,6 @@
 import { HashRouter, Route, Routes } from "react-router-dom";
 import Sidebar from "./components/Sidebar";
+import Ask from "./pages/Ask";
 import Home from "./pages/Home";
 import LogChat from "./pages/LogChat";
 import Preview from "./pages/Preview";
@@ -17,7 +18,7 @@ export default function App() {
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/log/:sid" element={<LogChat />} />
-            <Route path="/ask/:sid" element={<Placeholder name="질문" />} />
+            <Route path="/ask/:sid" element={<Ask />} />
             <Route path="/preview/:sid" element={<Preview />} />
             <Route path="/notes" element={<Placeholder name="연구노트" />} />
             <Route path="/notes/:id" element={<Placeholder name="연구노트" />} />
