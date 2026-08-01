@@ -4,16 +4,23 @@ import { api } from "../api";
 import { getSession, saveSession } from "../store";
 import type { ParsedLog, RecordDetail } from "../types";
 
-function Field({ label, value, onChange, rows = 1 }: {
-  label: string; value: string; onChange: (v: string) => void; rows?: number;
+function Field({ label, value, onChange, onBlur, rows = 1 }: {
+  label: string; value: string; onChange: (v: string) => void; onBlur?: () => void; rows?: number;
 }) {
   return (
     <label className="block">
       <div className="text-xs text-slate-400">{label}</div>
-      <textarea value={value} rows={rows} onChange={(e) => onChange(e.target.value)}
+      <textarea value={value} rows={rows} onChange={(e) => onChange(e.target.value)} onBlur={onBlur}
         className="mt-1 w-full resize-none rounded border border-slate-200 px-2 py-1.5 text-sm font-medium" />
     </label>
   );
+}
+
+function parseParameters(text: string): ParsedLog["parameters"] {
+  return text.split(",").map((x) => x.trim()).filter((x) => x.includes("=")).map((x) => {
+    const [name, ...rest] = x.split("=");
+    return { name: name.trim(), value: rest.join("=").trim(), controllable: true };
+  });
 }
 
 export default function Preview() {
@@ -27,10 +34,19 @@ export default function Preview() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [savedId, setSavedId] = useState<string | null>(null);  // 저장 성공 후 재시도 시 중복 생성 방지
+  // 공정변수는 typing 중 매 keystroke마다 파싱하면 "=" 없는 중간 세그먼트(예: 콤마 직후)가
+  // 즉시 버려져 기존 값이 오염된다. 그래서 draft는 로컬로만 들고, blur 시점에만 p.parameters에 반영한다.
+  const [paramsDraft, setParamsDraft] = useState(
+    () => (p?.parameters ?? []).map((x) => `${x.name}=${x.value}`).join(", "));
 
   useEffect(() => {
     if (session?.baseId) api.getRecord(session.baseId).then(setBase).catch(() => {});
   }, [session?.baseId]);
+
+  // 다른 필드 편집 등 외부 요인으로 p.parameters가 바뀌면 draft를 최신 상태로 재동기화한다.
+  useEffect(() => {
+    setParamsDraft((p?.parameters ?? []).map((x) => `${x.name}=${x.value}`).join(", "));
+  }, [p?.parameters]);
 
   if (!session || !p) return <div className="p-8 text-slate-500">미리볼 파싱 결과가 없습니다.</div>;
   if (session.saved && !savedId)
@@ -83,13 +99,9 @@ export default function Preview() {
         <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-5">
           <div className="font-semibold">조건·결과</div>
           <Field label="공정변수 (이름=값, 쉼표 구분)"
-            value={p.parameters.map((x) => `${x.name}=${x.value}`).join(", ")}
-            onChange={(v) => set({
-              parameters: v.split(",").map((x) => x.trim()).filter((x) => x.includes("=")).map((x) => {
-                const [name, ...rest] = x.split("=");
-                return { name: name.trim(), value: rest.join("=").trim(), controllable: true };
-              }),
-            })} />
+            value={paramsDraft}
+            onChange={setParamsDraft}
+            onBlur={() => set({ parameters: parseParameters(paramsDraft) })} />
           <Field label="결과" value={p.results} rows={2} onChange={(v) => set({ results: v })} />
           <label className="block">
             <div className="text-xs text-slate-400">증상 분류</div>
