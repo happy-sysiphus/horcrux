@@ -1,5 +1,6 @@
 import { HashRouter, Route, Routes } from "react-router-dom";
 import Sidebar from "./components/Sidebar";
+import Home from "./pages/Home";
 
 function Placeholder({ name }: { name: string }) {
   return <div className="p-8 text-slate-500">{name}</div>;
@@ -12,7 +13,7 @@ export default function App() {
         <Sidebar />
         <main className="min-w-0 flex-1 overflow-y-auto">
           <Routes>
-            <Route path="/" element={<Placeholder name="홈" />} />
+            <Route path="/" element={<Home />} />
             <Route path="/log/:sid" element={<Placeholder name="기록" />} />
             <Route path="/ask/:sid" element={<Placeholder name="질문" />} />
             <Route path="/preview/:sid" element={<Placeholder name="미리보기" />} />
