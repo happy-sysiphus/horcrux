@@ -3,6 +3,7 @@ import Sidebar from "./components/Sidebar";
 import Ask from "./pages/Ask";
 import Home from "./pages/Home";
 import LogChat from "./pages/LogChat";
+import Notes from "./pages/Notes";
 import Preview from "./pages/Preview";
 
 function Placeholder({ name }: { name: string }) {
@@ -20,8 +21,8 @@ export default function App() {
             <Route path="/log/:sid" element={<LogChat />} />
             <Route path="/ask/:sid" element={<Ask />} />
             <Route path="/preview/:sid" element={<Preview />} />
-            <Route path="/notes" element={<Placeholder name="연구노트" />} />
-            <Route path="/notes/:id" element={<Placeholder name="연구노트" />} />
+            <Route path="/notes" element={<Notes />} />
+            <Route path="/notes/:id" element={<Notes />} />
             <Route path="/followup/:sid" element={<Placeholder name="후속 실험" />} />
           </Routes>
         </main>
