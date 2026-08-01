@@ -1,14 +1,11 @@
 import { HashRouter, Route, Routes } from "react-router-dom";
 import Sidebar from "./components/Sidebar";
 import Ask from "./pages/Ask";
+import FollowUp from "./pages/FollowUp";
 import Home from "./pages/Home";
 import LogChat from "./pages/LogChat";
 import Notes from "./pages/Notes";
 import Preview from "./pages/Preview";
-
-function Placeholder({ name }: { name: string }) {
-  return <div className="p-8 text-slate-500">{name}</div>;
-}
 
 export default function App() {
   return (
@@ -23,7 +20,7 @@ export default function App() {
             <Route path="/preview/:sid" element={<Preview />} />
             <Route path="/notes" element={<Notes />} />
             <Route path="/notes/:id" element={<Notes />} />
-            <Route path="/followup/:sid" element={<Placeholder name="후속 실험" />} />
+            <Route path="/followup/:sid" element={<FollowUp />} />
           </Routes>
         </main>
       </div>
