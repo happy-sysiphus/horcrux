@@ -93,11 +93,11 @@ def main(argv: list[str] | None = None) -> None:
         elif args.cmd == "serve":
             try:
                 from .server import run_serve
+                run_serve(cfg, args.host, args.port)
             except ModuleNotFoundError as e:
                 raise RuntimeError(
-                    f"웹 UI 의존성이 없습니다 ({e.name}) — pip install \"horcrux[web]\" 후 다시 실행하세요"
+                    f"웹 UI 의존성이 없습니다 ({e.name}) — pip install -e \".[web]\" 후 다시 실행하세요"
                 ) from None
-            run_serve(cfg, args.host, args.port)
     except RuntimeError as e:
         print(e, file=sys.stderr)
         sys.exit(1)

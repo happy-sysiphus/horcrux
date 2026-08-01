@@ -1,3 +1,5 @@
+import sys
+
 import pytest
 import yaml
 
@@ -45,6 +47,19 @@ def test_cli_bot_without_token_exits_clean(monkeypatch, isolated_config, capsys)
     assert ei.value.code == 1
     err = capsys.readouterr().err
     assert "토큰" in err   # 깔끔한 메시지, 트레이스백 아님
+
+
+def test_cli_serve_missing_uvicorn_exits_clean(monkeypatch, capsys):
+    # fastapi는 있고 uvicorn만 없는 상황(dev extra 설치) 재현 — run_serve 호출이
+    # try 밖에 있으면 여기서 트레이스백으로 죽는다 (79c76be 회귀).
+    monkeypatch.setitem(sys.modules, "uvicorn", None)
+    from horcrux.cli import main
+    with pytest.raises(SystemExit) as ei:
+        main(["serve"])
+    assert ei.value.code == 1
+    err = capsys.readouterr().err
+    assert "uvicorn" in err
+    assert "pip install -e" in err   # 무관한 PyPI horcrux 패키지를 가리키지 않아야 함
 
 
 def test_cli_init_writes_config(monkeypatch, isolated_config):
