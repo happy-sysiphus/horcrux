@@ -91,7 +91,12 @@ def main(argv: list[str] | None = None) -> None:
             from . import bot
             bot.run_bot(cfg)
         elif args.cmd == "serve":
-            from .server import run_serve
+            try:
+                from .server import run_serve
+            except ModuleNotFoundError as e:
+                raise RuntimeError(
+                    f"웹 UI 의존성이 없습니다 ({e.name}) — pip install \"horcrux[web]\" 후 다시 실행하세요"
+                ) from None
             run_serve(cfg, args.host, args.port)
     except RuntimeError as e:
         print(e, file=sys.stderr)

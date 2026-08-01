@@ -10,7 +10,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest"]
+dev = ["pytest", "fastapi", "httpx"]  # tests/test_server.py가 fastapi.testclient(→httpx)를 import
 release = ["build", "pyinstaller"]
 web = ["fastapi", "uvicorn"]
 
