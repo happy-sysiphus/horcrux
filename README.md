@@ -83,7 +83,18 @@ horcrux log           # 실험 로그 기록 (부족 정보 되물음, 저장 �
 horcrux ask           # 문제 질의 (과거 유사 사례·위키 근거로 답변)
 horcrux absorb        # 위키 재편찬 (log/seed가 자동 실행 — 실패 시 재시도용)
 horcrux feedback <id> --resolved y --cause "타겟 산화"   # 결과 피드백
+horcrux serve         # 웹 UI (LAB GENE) — http://127.0.0.1:8765
 ```
+
+## 웹 UI (LAB GENE)
+
+    pip install -e ".[web]"
+    cd web && npm install && npm run build && cd ..
+    horcrux serve
+
+브라우저에서 http://127.0.0.1:8765 접속. 기록/질문/연구노트/실험 피드백/후속 실험을
+브라우저에서 수행한다 (CLI·디스코드 봇과 같은 볼트 공유).
+개발 모드: `horcrux serve` + `cd web && npm run dev` (vite가 /api 프록시).
 
 ## 연구실 설정 (§2a)
 
