@@ -3,9 +3,9 @@ __pycache__/
 .pytest_cache/
 .pytest_tmp/
 .superpowers/
-dist/
-build/
+.claude/
+/dist/
+/build/
 horcrux.spec
 web/node_modules/
-web/dist/
 web/*.tsbuildinfo
