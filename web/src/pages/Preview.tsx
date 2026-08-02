@@ -38,7 +38,9 @@ function DraftField<T>({ label, value, serialize, parse, onCommit, rows = 1 }: {
 }) {
   const [draft, setDraft] = useState(() => serialize(value));
   // 다른 필드 편집 등 외부 요인으로 value의 참조가 바뀌면 draft를 재동기화한다.
-  useEffect(() => setDraft(serialize(value)), [value]);
+  useEffect(() => {
+    setDraft(serialize(value));
+  }, [value]);
   return (
     <Field label={label} value={draft} rows={rows} onChange={setDraft}
       onBlur={() => onCommit(parse(draft))} />

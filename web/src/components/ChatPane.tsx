@@ -9,7 +9,12 @@ export default function ChatPane({ messages, onSend, busy, placeholder }: {
 }) {
   const [text, setText] = useState("");
   const bottom = useRef<HTMLDivElement>(null);
-  useEffect(() => bottom.current?.scrollIntoView?.({ behavior: "smooth" }), [messages, busy]);
+  // 블록 본문 필수 — 간결 본문이면 scrollIntoView의 반환값이 그대로 effect 반환값이 되고,
+  // React가 그것을 정리 함수로 보고 호출한다. 확장/폴리필이 이 API를 덮어써 값을 돌려주면
+  // 다음 렌더나 언마운트에서 "is not a function"으로 트리 전체가 죽는다.
+  useEffect(() => {
+    bottom.current?.scrollIntoView?.({ behavior: "smooth" });
+  }, [messages, busy]);
 
   function send(t: string) {
     if (!t.trim() || busy) return;
