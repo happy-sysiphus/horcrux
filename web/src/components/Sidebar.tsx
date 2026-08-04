@@ -41,6 +41,9 @@ export default function Sidebar() {
         <Link to="/notes" className={`mt-1 rounded px-3 py-2 text-sm ${loc.pathname.startsWith("/notes") ? "bg-slate-700" : "hover:bg-slate-800"}`}>
           ▤ 연구노트
         </Link>
+        <Link to="/graph" className={`mt-1 rounded px-3 py-2 text-sm ${loc.pathname.startsWith("/graph") ? "bg-slate-700" : "hover:bg-slate-800"}`}>
+          ◈ 그래프뷰
+        </Link>
       </nav>
       <aside className="w-60 shrink-0 overflow-y-auto border-r border-slate-200 bg-white p-3">
         <button onClick={() => nav("/")}
