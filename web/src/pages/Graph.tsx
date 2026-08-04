@@ -113,6 +113,13 @@ export default function Graph() {
                 ctx.arc(n.x, n.y, 8, 0, 2 * Math.PI);
                 ctx.fill();
               }}
+              nodeLabel={(node) => {
+                const n = node as unknown as GraphNode;
+                // 툴팁은 innerHTML로 들어간다 — 자유 서술(원인 등) 이스케이프 필수
+                const esc = (s: string) =>
+                  s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+                return esc(n.full);
+              }}
               linkColor={() => "#cbd5e1"}
               onNodeClick={(node) => setSelected(node as unknown as GraphNode)}
               onBackgroundClick={() => setSelected(null)}

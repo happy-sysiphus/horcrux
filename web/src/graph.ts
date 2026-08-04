@@ -12,6 +12,9 @@ export interface GraphNode {
 export interface GraphLink { source: string; target: string }
 
 const CAUSE_LABEL_MAX = 30;
+const EXP_LABEL_MAX = 24;
+
+const truncate = (s: string, max: number) => (s.length > max ? s.slice(0, max) + "…" : s);
 
 // GET /api/records 메타에서 노드·엣지 유도 — 서버 신규 계층 없이 클라이언트에서 완결.
 // 동일성 판정은 trim 후 문자열 일치. 원인은 resolution.actual_cause(확정)만 노드로 올린다
@@ -37,14 +40,19 @@ export function buildGraph(records: RecordMeta[]): { nodes: GraphNode[]; links: 
       if (!existing.recIds.includes(recId)) existing.recIds.push(recId);
       return id;
     }
-    const label = kind === "cause" && clean.length > CAUSE_LABEL_MAX
-      ? clean.slice(0, CAUSE_LABEL_MAX) + "…" : clean;
+    const label = kind === "cause" ? truncate(clean, CAUSE_LABEL_MAX) : clean;
     nodes.set(id, { id, kind, label, full: clean, recIds: [recId] });
     return id;
   };
 
+  // 라벨은 다른 화면과 동일하게 objective 우선 — experiment_type은 저카디널리티라
+  // (같은 유형 반복 실험이 흔함) 라벨이 전부 겹친다. full=id는 호버 툴팁용(유일값).
   for (const r of records)
-    nodes.set(r.id, { id: r.id, kind: "exp", label: r.experiment_type || r.id, full: r.id, recIds: [r.id] });
+    nodes.set(r.id, {
+      id: r.id, kind: "exp",
+      label: truncate(r.objective || r.experiment_type || r.id, EXP_LABEL_MAX),
+      full: r.id, recIds: [r.id],
+    });
 
   for (const r of records) {
     for (const e of r.equipment) {

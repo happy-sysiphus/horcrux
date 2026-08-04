@@ -40,6 +40,16 @@ describe("buildGraph", () => {
     expect(causes[0].full).toBe(long);
   });
 
+  it("실험 노드 라벨은 objective 우선, 없으면 experiment_type", () => {
+    const { nodes } = buildGraph([
+      mk({ id: "a", objective: "50nm Al2O3 증착", experiment_type: "증착" }),
+      mk({ id: "b", objective: "", experiment_type: "증착" }),
+    ]);
+    const exps = nodes.filter((n) => n.kind === "exp");
+    expect(exps.map((n) => n.label)).toEqual(["50nm Al2O3 증착", "증착"]);
+    expect(exps[0].full).toBe("a"); // 툴팁용 고유 id
+  });
+
   it("followup_of 엣지는 대상 레코드가 있을 때만 만든다", () => {
     const { links } = buildGraph([
       mk({ id: "base" }),
