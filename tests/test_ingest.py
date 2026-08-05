@@ -129,3 +129,33 @@ def test_save_unparsed_preserves_text(tmp_path):
     rec, body = load_record(path)
     assert rec.needs_review is True
     assert "원문 로그" in body
+
+
+def test_missing_required_notes_gate():
+    vc = VaultConfig(required_fields=["notes"], required_parameters=[])
+    p = full_parsed()
+    assert missing_required(p, vc) == [
+        "실험 중 특이사항이 있었나요? 없었다면 '특이사항 없음'이라고 알려주세요."]
+    p.notes = "특이사항 없음"
+    assert missing_required(p, vc) == []
+
+
+def test_missing_required_unit_gate():
+    p = full_parsed()
+    p.parameters_missing_unit = ["RF power"]
+    assert missing_required(p, DEFAULT_VC) == ["공정변수 'RF power'의 단위를 알려주세요."]
+
+
+def test_parse_log_filters_hallucinated_missing_unit(monkeypatch):
+    p = full_parsed()
+    p.parameters_missing_unit = ["RF power", "없는 변수"]
+    monkeypatch.setattr(ingest, "generate_parsed", lambda cfg, s, u, sc: p)
+    out = parse_log(Config(vault="v"), "로그", DEFAULT_VC)
+    assert out.parameters_missing_unit == ["RF power"]
+
+
+def test_to_record_carries_notes(tmp_path):
+    p = full_parsed()
+    p.notes = "펌프 소음 있었음"
+    rec = to_record(tmp_path, p, "2026-08-05")
+    assert rec.notes == "펌프 소음 있었음"

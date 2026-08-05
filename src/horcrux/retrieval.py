@@ -47,10 +47,11 @@ def retrieve(cfg: Config, query: str, top_k: int = 3) -> dict:
             res_tag = f"해결: {rec.resolution.actual_cause or '원인 미기록'}"
         else:
             res_tag = "미해결"
+        notes_tag = f" | 특이사항: {rec.notes[:60]}" if rec.notes.strip() else ""
         lines.append(
             f"- {rec.id} | {rec.experiment_type} | 장비: {', '.join(rec.equipment) or '-'} | "
             f"재료: {', '.join(rec.materials) or '-'} | 증상: {rec.symptom.category} {rec.symptom.description} | "
-            f"결과: {rec.results[:80]} | {res_tag}"
+            f"결과: {rec.results[:80]} | {res_tag}{notes_tag}"
         )
     wiki = _wiki_articles(cfg.vault)
     if not rec_paths and not wiki:

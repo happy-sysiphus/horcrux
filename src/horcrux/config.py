@@ -56,7 +56,7 @@ def save_config(values: dict) -> Path:
 
 
 # §2a — 구조 카테고리 하드 게이트 후보 (볼트 config.yaml의 required_fields가 이 중에서 선택)
-GATEABLE_FIELDS = ["objective", "parameters", "results", "symptom", "actions_taken"]
+GATEABLE_FIELDS = ["objective", "parameters", "results", "symptom", "actions_taken", "notes"]
 
 
 @dataclass

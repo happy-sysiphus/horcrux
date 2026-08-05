@@ -42,6 +42,7 @@ class ExperimentRecord(BaseModel):
     symptom: Symptom = Field(default_factory=Symptom)
     suspected_causes: list[SuspectedCause] = Field(default_factory=list)
     actions_taken: list[str] = Field(default_factory=list)
+    notes: str = ""  # 특이사항 — 문제로 단정되지 않은 과정 관찰·절차 일탈·환경 특이점
     resolution: Resolution = Field(default_factory=Resolution)
     followup_of: str | None = None  # 후속 실험이면 기준 레코드 id
     needs_review: bool = False

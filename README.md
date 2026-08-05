@@ -98,13 +98,15 @@ horcrux serve         # 웹 UI (LAB GENE) — http://127.0.0.1:8765
 
 ## 연구실 설정 (§2a)
 
-볼트에 `config.yaml`을 두면 기록 시 하드 게이트가 적용된다 (없으면 5개 카테고리 전부 기본):
+볼트에 `config.yaml`을 두면 기록 시 하드 게이트가 적용된다 (없으면 6개 카테고리 전부 기본):
 
 ```
-required_fields: [objective, parameters, results, symptom, actions_taken]
+required_fields: [objective, parameters, results, symptom, actions_taken, notes]
 required_parameters:
   - 기판 온도
   - 챔버 습도
 ```
+
+공정변수는 단위 포함이 필수다 — 단위 없이 기록하면 재질문한다 (횟수·비율 등 무차원 값 예외).
 
 설계 문서: `docs/superpowers/specs/2026-07-19-horcrux-mvp-design.md`
