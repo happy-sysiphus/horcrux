@@ -6,7 +6,7 @@ import { useLogLoop } from "../useLogLoop";
 export default function LogChat() {
   const { sid } = useParams();
   const nav = useNavigate();
-  const { session, busy, error, requiredTotal, canSave, onSend, onSaveRaw, runParse } = useLogLoop(sid);
+  const { session, busy, error, requiredTotal, canSave, onSend, onSaveRaw, runParse, rewind, fork } = useLogLoop(sid);
 
   if (!session) return <div className="p-8 text-slate-500">세션을 찾을 수 없습니다.</div>;
 
@@ -25,7 +25,9 @@ export default function LogChat() {
           </div>
         )}
         <div className="min-h-0 flex-1">
-          <ChatPane messages={session.messages} onSend={onSend} busy={busy} />
+          <ChatPane messages={session.messages} onSend={onSend} busy={busy}
+            onRewind={session.saved ? undefined : rewind}
+            onFork={session.saved ? undefined : fork} />
         </div>
       </div>
       <StructurePanel parsed={session.parsed} gaps={session.gaps} canSave={canSave}

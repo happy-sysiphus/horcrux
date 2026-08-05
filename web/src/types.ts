@@ -53,6 +53,11 @@ export interface AppConfig {
 }
 
 export interface ChatMsg { role: "user" | "ai"; text: string; chips?: string[] }
+// 사용자 발화 직전의 대화 상태 — 되감기·포크의 복원 지점
+export interface ConvoSnapshot {
+  rawText: string; messages: ChatMsg[]; parsed: ParsedLog | null;
+  gaps: string[]; gapIndex: number; answers: string[]; rounds: number;
+}
 export interface Session {
   id: string;
   kind: "log" | "ask" | "followup";
@@ -68,4 +73,5 @@ export interface Session {
   answers: string[];       // 로컬 누적 답변 (재파싱 전)
   rounds: number;          // 재파싱 횟수 (최대 3)
   askResult?: AskResult;
+  history?: ConvoSnapshot[]; // n번째 = n+1번째 사용자 발화 직전 상태 (초기 로그 제외)
 }

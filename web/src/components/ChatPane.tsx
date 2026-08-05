@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import type { ChatMsg } from "../types";
 
-export default function ChatPane({ messages, onSend, busy, placeholder }: {
+export default function ChatPane({ messages, onSend, busy, placeholder, onRewind, onFork }: {
   messages: ChatMsg[];
   onSend: (text: string) => void;
   busy: boolean;
   placeholder?: string;
+  onRewind?: (uIdx: number) => void; // uIdx = 사용자 발화 순번 (0=초기 로그)
+  onFork?: (uIdx: number) => void;
 }) {
   const [text, setText] = useState("");
   const bottom = useRef<HTMLDivElement>(null);
@@ -22,11 +24,18 @@ export default function ChatPane({ messages, onSend, busy, placeholder }: {
     onSend(t.trim());
   }
 
+  // 사용자 발화 순번 부여 — 되감기·포크가 스냅샷 인덱스로 역산할 키
+  let u = -1;
+  const rows = messages.map((m, i) => {
+    if (m.role === "user") u += 1;
+    return { m, i, uIdx: m.role === "user" ? u : -1 };
+  });
+
   return (
     <div className="flex h-full flex-col">
       <div className="flex-1 space-y-4 overflow-y-auto p-6">
-        {messages.map((m, i) => (
-          <div key={i}>
+        {rows.map(({ m, i, uIdx }) => (
+          <div key={i} className="group">
             <div className={`text-xs text-slate-400 ${m.role === "user" ? "text-right" : ""}`}>
               {m.role === "user" ? "사용자" : "LAB GENE AI"}
             </div>
@@ -35,6 +44,18 @@ export default function ChatPane({ messages, onSend, busy, placeholder }: {
               : "w-fit max-w-[85%] rounded-xl border-l-4 border-blue-500 bg-white px-4 py-3 text-sm shadow-sm whitespace-pre-wrap"}>
               {m.text}
             </div>
+            {m.role === "user" && uIdx >= 1 && !busy && (onRewind || onFork) && (
+              <div className="mt-1 flex justify-end gap-3 opacity-0 transition-opacity group-hover:opacity-100">
+                {onRewind && (
+                  <button onClick={() => onRewind(uIdx)}
+                    className="text-xs text-slate-400 hover:text-blue-600">↩ 이 답변 전으로 되감기</button>
+                )}
+                {onFork && (
+                  <button onClick={() => onFork(uIdx)}
+                    className="text-xs text-slate-400 hover:text-blue-600">⑂ 여기서 포크</button>
+                )}
+              </div>
+            )}
             {m.role === "ai" && m.chips && i === messages.length - 1 && !busy && (
               <div className="mt-2 flex flex-wrap gap-2">
                 {m.chips.map((c) => (

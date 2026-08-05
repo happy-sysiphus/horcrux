@@ -43,22 +43,6 @@ export default function Home() {
         </div>
       </div>
 
-      <div className="mt-10">
-        <h2 className="mb-3 font-semibold">빠른 시작</h2>
-        <div className="grid grid-cols-2 gap-4">
-          <button onClick={() => setMode("log")}
-            className={`rounded-xl border bg-white p-5 text-left shadow-sm hover:border-blue-400 ${mode === "log" ? "border-blue-400" : "border-slate-200"}`}>
-            <div className="font-medium">📄 오늘 실험을 기록할게요</div>
-            <div className="mt-1 text-sm text-slate-500">실험 조건과 결과를 구조화합니다.</div>
-          </button>
-          <button onClick={() => setMode("ask")}
-            className={`rounded-xl border bg-white p-5 text-left shadow-sm hover:border-blue-400 ${mode === "ask" ? "border-blue-400" : "border-slate-200"}`}>
-            <div className="font-medium">🔍 과거 유사 사례를 찾아주세요</div>
-            <div className="mt-1 text-sm text-slate-500">연구실 기록에서 근거를 검색합니다.</div>
-          </button>
-        </div>
-      </div>
-
       {drafts.length > 0 && (
         <div className="mt-10 rounded-xl border border-amber-200 bg-amber-50 p-4">
           <div className="font-medium">최근 미완료 기록 {drafts.length}건</div>

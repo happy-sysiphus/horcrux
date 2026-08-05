@@ -11,7 +11,7 @@ import type { RecordDetail } from "../types";
 export default function FollowUp() {
   const { sid } = useParams();
   const nav = useNavigate();
-  const { session, busy, error, requiredTotal, canSave, onSend, onSaveRaw, runParse } = useLogLoop(sid);
+  const { session, busy, error, requiredTotal, canSave, onSend, onSaveRaw, runParse, rewind, fork } = useLogLoop(sid);
   const [base, setBase] = useState<RecordDetail | null>(null);
 
   useEffect(() => {
@@ -56,7 +56,9 @@ export default function FollowUp() {
         )}
         <div className="min-h-0 flex-1">
           <ChatPane messages={session.messages} onSend={onSend} busy={busy}
-            placeholder="후속 실험 내용을 입력하세요 (무엇을 바꿨고 결과가 어땠는지)" />
+            placeholder="후속 실험 내용을 입력하세요 (무엇을 바꿨고 결과가 어땠는지)"
+            onRewind={session.saved ? undefined : rewind}
+            onFork={session.saved ? undefined : fork} />
         </div>
       </div>
       <StructurePanel parsed={session.parsed} gaps={session.gaps} canSave={canSave}

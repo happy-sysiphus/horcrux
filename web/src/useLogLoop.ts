@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "./api";
-import { getSession, saveSession } from "./store";
-import type { Session } from "./types";
+import { getSession, newSession, saveSession } from "./store";
+import type { ConvoSnapshot, Session } from "./types";
 
 const MAX_ROUNDS = 3;
 
@@ -66,8 +66,39 @@ export function useLogLoop(sid: string | undefined) {
     }
   }, [session]);
 
+  function snapshot(s: Session): ConvoSnapshot {
+    return structuredClone({
+      rawText: s.rawText, messages: s.messages, parsed: s.parsed,
+      gaps: s.gaps, gapIndex: s.gapIndex, answers: s.answers, rounds: s.rounds,
+    });
+  }
+
+  // uIdx = 대화 내 사용자 발화 순번(0=초기 로그). history[uIdx-1]이 그 발화 직전 상태.
+  function rewind(uIdx: number) {
+    const s = session!;
+    const snap = (s.history ?? [])[uIdx - 1];
+    if (!snap || busy) return;
+    Object.assign(s, structuredClone(snap));
+    s.history = (s.history ?? []).slice(0, uIdx - 1);
+    setError(null);
+    update(s);
+  }
+
+  function fork(uIdx: number) {
+    const s = session!;
+    const snap = (s.history ?? [])[uIdx - 1];
+    if (!snap || busy) return;
+    const ns = newSession(s.kind, s.baseId);
+    Object.assign(ns, structuredClone(snap));
+    ns.title = "⑂ " + s.title;
+    ns.history = [];
+    saveSession(ns);
+    nav(s.kind === "followup" ? `/followup/${ns.id}` : `/log/${ns.id}`);
+  }
+
   async function onSend(text: string) {
     const s = session!;
+    s.history = [...(s.history ?? []), snapshot(s)];
     s.messages.push({ role: "user", text });
     if (!s.parsed) {
       s.rawText = s.rawText ? `${s.rawText}\n${text}` : text;
@@ -112,5 +143,5 @@ export function useLogLoop(sid: string | undefined) {
   const canSave = !!session &&
     (session.gapIndex >= session.gaps.length || session.rounds >= MAX_ROUNDS);
 
-  return { session, busy, error, requiredTotal, canSave, onSend, onSaveRaw, runParse };
+  return { session, busy, error, requiredTotal, canSave, onSend, onSaveRaw, runParse, rewind, fork };
 }

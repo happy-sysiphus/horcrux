@@ -11,6 +11,7 @@ function normalize(s: Partial<Session>): Session {
     parsed: s.parsed ?? null, gaps: Array.isArray(s.gaps) ? s.gaps : [],
     gapIndex: s.gapIndex ?? 0, answers: Array.isArray(s.answers) ? s.answers : [],
     rounds: s.rounds ?? 0, askResult: s.askResult,
+    history: Array.isArray(s.history) ? s.history : [],
   };
 }
 function readAll(): Session[] {
