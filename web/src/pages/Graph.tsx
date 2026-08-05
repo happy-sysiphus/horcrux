@@ -20,6 +20,7 @@ export default function Graph() {
   const [error, setError] = useState<string | null>(null);
   const [hidden, setHidden] = useState<ReadonlySet<NodeKind>>(new Set());
   const [selected, setSelected] = useState<GraphNode | null>(null);
+  const [hover, setHover] = useState<string | null>(null);
   const wrap = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ w: 600, h: 400 });
 
@@ -44,15 +45,31 @@ export default function Graph() {
 
   // force-graph는 넘긴 객체에 좌표를 덧쓰며 링크의 source/target을 노드 참조로 바꾼다.
   // 재계산 때마다 새 사본을 만들어 원본(테스트 가능 순수 데이터)을 보호한다.
+  // adj(인접 노드 맵)는 mutate 전 문자열 id 기준으로 같이 만들어 둔다 — 호버 하이라이트용.
   const data = useMemo(() => {
     const { nodes, links } = buildGraph(records);
     const visible = nodes.filter((n) => !hidden.has(n.kind));
     const ids = new Set(visible.map((n) => n.id));
+    const kept = links.filter((l) => ids.has(l.source) && ids.has(l.target));
+    const adj = new Map<string, Set<string>>();
+    for (const l of kept) {
+      if (!adj.has(l.source)) adj.set(l.source, new Set());
+      if (!adj.has(l.target)) adj.set(l.target, new Set());
+      adj.get(l.source)!.add(l.target);
+      adj.get(l.target)!.add(l.source);
+    }
     return {
       nodes: visible.map((n) => ({ ...n })),
-      links: links.filter((l) => ids.has(l.source) && ids.has(l.target)).map((l) => ({ ...l })),
+      links: kept.map((l) => ({ ...l })),
+      adj,
     };
   }, [records, hidden]);
+
+  // mutate 후 링크의 source/target은 노드 객체 — id로 되돌려 읽는다.
+  const endId = (v: unknown): string =>
+    typeof v === "object" && v !== null ? (v as { id: string }).id : (v as string);
+  const linkTouchesHover = (l: { source: unknown; target: unknown }) =>
+    hover !== null && (endId(l.source) === hover || endId(l.target) === hover);
 
   const toggle = (k: NodeKind) => {
     const next = new Set(hidden);
@@ -90,12 +107,14 @@ export default function Graph() {
               graphData={data}
               nodeCanvasObject={(node, ctx, scale) => {
                 const n = node as unknown as GraphNode & { x: number; y: number };
+                const active = !hover || n.id === hover || !!data.adj.get(hover)?.has(n.id);
+                ctx.globalAlpha = active ? 1 : 0.12;
                 const r = n.kind === "exp" ? 6 : 4;
                 ctx.fillStyle = KIND_COLOR[n.kind];
                 ctx.beginPath();
                 ctx.arc(n.x, n.y, r, 0, 2 * Math.PI);
                 ctx.fill();
-                if (selected?.id === n.id) {
+                if (selected?.id === n.id || (hover === n.id && active)) {
                   ctx.strokeStyle = "#1e293b";
                   ctx.lineWidth = 1.5 / scale;
                   ctx.stroke();
@@ -105,6 +124,7 @@ export default function Graph() {
                 ctx.textBaseline = "top";
                 ctx.fillStyle = "#475569";
                 ctx.fillText(n.label, n.x, n.y + r + 2 / scale);
+                ctx.globalAlpha = 1;
               }}
               nodePointerAreaPaint={(node, color, ctx) => {
                 const n = node as unknown as { x: number; y: number };
@@ -120,7 +140,14 @@ export default function Graph() {
                   s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
                 return esc(n.full);
               }}
-              linkColor={() => "#cbd5e1"}
+              linkColor={(l) => {
+                if (!hover) return "#cbd5e1";
+                return linkTouchesHover(l as { source: unknown; target: unknown })
+                  ? "#64748b" : "rgba(203, 213, 225, 0.15)";
+              }}
+              linkWidth={(l) =>
+                linkTouchesHover(l as { source: unknown; target: unknown }) ? 2 : 1}
+              onNodeHover={(node) => setHover(node ? (node as unknown as GraphNode).id : null)}
               onNodeClick={(node) => setSelected(node as unknown as GraphNode)}
               onBackgroundClick={() => setSelected(null)}
             />
