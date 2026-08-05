@@ -22,7 +22,7 @@ PARSE_SYSTEM = """당신은 wet lab 실험 로그를 구조화하는 조수다.
 - symptom: 문제 증상 분류 — low_value(값이 낮음), unstable(불안정/재현성 문제), abnormal(비정상 개형/거동), none(문제 없음)
 - suspected_causes: 로그에 언급된 추측 원인 (전부 status=unconfirmed)
 - actions_taken: 취한 조치
-- summary: 로그를 2~4문장으로 정리한 서술
+- summary: 로그를 2~4문장으로 정리한 서술 (마크다운 서식 없이 평문)
 - unrecorded_required_parameters: 사용자 메시지에 [연구실 필수 파라미터 목록]이 있으면, 각 항목이
   로그에 기재됐는지 판단해 미기재 항목명만 목록의 표기 그대로 나열하라. 표현이 달라도 의미가 같으면
   기재된 것으로 본다 (예: 목록의 "챔버 습도" ↔ 로그의 "습도 40%"). 목록이 없으면 빈 목록.

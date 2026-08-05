@@ -58,6 +58,17 @@ def test_wiki_only_labelled_wiki_based(tmp_path, monkeypatch):
     assert "일반 지식" not in out
 
 
+def test_answer_strips_markdown(tmp_path, monkeypatch):
+    monkeypatch.setattr(dg, "retrieve", lambda cfg, q, **kw: {"records": [], "wiki": []})
+    monkeypatch.setattr(
+        dg, "generate",
+        lambda cfg, s, u: "## 원인 후보\n**전구체 열화**가 유력합니다.\n- 확인: **개봉일** 점검")
+    d = dg.diagnose_data(Config(vault=tmp_path), "질문")
+    assert "**" not in d["answer"]
+    assert "##" not in d["answer"]
+    assert "전구체 열화가 유력합니다." in d["answer"]
+
+
 def test_diagnose_data_shape(tmp_path, monkeypatch):
     from horcrux.records import ExperimentRecord, save_record, record_path
 
