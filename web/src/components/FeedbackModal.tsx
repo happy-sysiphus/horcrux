@@ -25,8 +25,9 @@ export default function FeedbackModal({ detail, onClose, onDone }: {
   }
 
   return (
-    <div className="fixed inset-0 z-10 flex items-center justify-center bg-black/30" onClick={onClose}>
-      <div className="w-96 rounded-xl bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/30 md:items-center" onClick={onClose}>
+      <div className="max-h-[88vh] w-full overflow-y-auto rounded-t-2xl bg-white p-5 shadow-xl md:w-96 md:rounded-xl md:p-6"
+        onClick={(e) => e.stopPropagation()}>
         <div className="text-lg font-bold">실험 피드백 — {detail.record.id}</div>
         <p className="mt-1 text-xs text-slate-500">과거 실험의 해결 여부·확정 원인을 갱신합니다.</p>
         <div className="mt-4 flex gap-2">
@@ -56,9 +57,9 @@ export default function FeedbackModal({ detail, onClose, onDone }: {
           className="mt-3 w-full rounded border border-slate-300 px-2 py-1.5 text-sm" />
         {error && <div className="mt-2 text-sm text-red-600">{error}</div>}
         <div className="mt-4 flex justify-end gap-2">
-          <button onClick={onClose} className="rounded-lg border border-slate-300 px-4 py-2 text-sm">취소</button>
+          <button onClick={onClose} className="flex-1 rounded-lg border border-slate-300 px-4 py-2.5 text-sm md:flex-none">취소</button>
           <button onClick={submit} disabled={busy}
-            className="rounded-lg bg-blue-600 px-4 py-2 text-sm text-white disabled:opacity-40">반영</button>
+            className="flex-1 rounded-lg bg-blue-600 px-4 py-2.5 text-sm text-white disabled:opacity-40 md:flex-none">반영</button>
         </div>
       </div>
     </div>

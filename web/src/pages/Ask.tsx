@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { api } from "../api";
 import ChatPane from "../components/ChatPane";
 import RecordCard from "../components/RecordCard";
+import { MobileBar, MobileTabs } from "../nav";
 import { getSession, saveSession } from "../store";
 import type { Session } from "../types";
 
@@ -19,6 +20,7 @@ export default function Ask() {
   const [session, setSession] = useState<Session | null>(() => getSession(sid ?? "") ?? null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [tab, setTab] = useState<"chat" | "panel">("chat");
   const started = useRef(false);
 
   function update(s: Session) {
@@ -55,20 +57,26 @@ export default function Ask() {
   const banner = session.askResult ? BANNERS[session.askResult.evidence] : null;
 
   return (
-    <div className="flex h-screen">
-      <div className="flex min-w-0 flex-1 flex-col">
-        <header className="border-b border-slate-200 bg-white px-6 py-3">
+    <div className="flex h-screen flex-col md:flex-row">
+      {/* 모바일에서 '유사 사례' 탭이면 이 열은 바·탭만 차지하고 남는 높이를 패널에 넘긴다 */}
+      <div className={`flex min-w-0 flex-col md:min-h-0 md:flex-1 ${tab === "chat" ? "min-h-0 flex-1" : "shrink-0"}`}>
+        <MobileBar title={session.title === "새 대화" ? "과거 기록 분석" : session.title} subtitle="과거 기록 분석" />
+        <header className="hidden border-b border-slate-200 bg-white px-6 py-3 md:block">
           <div className="font-bold">{session.title === "새 대화" ? "과거 기록 분석" : session.title}</div>
           <div className="text-xs text-slate-400">과거 기록 분석</div>
         </header>
+        <MobileTabs value={tab} onChange={setTab} tabs={[
+          { key: "chat", label: "대화" },
+          { key: "panel", label: <>유사 사례{session.askResult ? ` · ${session.askResult.records.length}` : ""}</> },
+        ]} />
         {banner && <div className={`px-6 py-2 text-sm ${banner.cls}`}>{banner.text}</div>}
         {error && (
-          <div className="flex gap-3 bg-red-50 px-6 py-2 text-sm text-red-700">
+          <div className="flex flex-wrap gap-3 bg-red-50 px-6 py-2 text-sm text-red-700">
             {error}
             <button onClick={() => runAsk(session, session.rawText)} className="underline">재시도</button>
           </div>
         )}
-        <div className="min-h-0 flex-1">
+        <div className={`min-h-0 flex-1 ${tab === "chat" ? "" : "hidden md:block"}`}>
           <ChatPane messages={session.messages} busy={busy}
             placeholder="추가 질문을 입력하세요"
             onSend={(t) => {
@@ -79,7 +87,8 @@ export default function Ask() {
             }} />
         </div>
       </div>
-      <div className="w-80 shrink-0 overflow-y-auto border-l border-slate-200 bg-white p-5">
+      <div className={`min-h-0 w-full flex-1 overflow-y-auto border-slate-200 bg-white p-5
+        md:w-80 md:flex-none md:shrink-0 md:border-l ${tab === "panel" ? "block" : "hidden md:block"}`}>
         <div className="text-lg font-bold">유사 사례</div>
         {!session.askResult && <div className="mt-4 text-sm text-slate-400">질문하면 관련 기록이 표시됩니다.</div>}
         <div className="mt-3 space-y-3">

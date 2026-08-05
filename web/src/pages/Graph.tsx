@@ -4,6 +4,7 @@ import ForceGraph2D from "react-force-graph-2d";
 import { api } from "../api";
 import { buildGraph, type GraphNode, type NodeKind } from "../graph";
 import RecordCard from "../components/RecordCard";
+import { MobileBar } from "../nav";
 import type { RecordMeta } from "../types";
 
 const KIND_LABEL: Record<NodeKind, string> = { exp: "실험", equipment: "장비", material: "재료", cause: "원인" };
@@ -68,8 +69,10 @@ export default function Graph() {
   // mutate 후 링크의 source/target은 노드 객체 — id로 되돌려 읽는다.
   const endId = (v: unknown): string =>
     typeof v === "object" && v !== null ? (v as { id: string }).id : (v as string);
-  const linkTouchesHover = (l: { source: unknown; target: unknown }) =>
-    hover !== null && (endId(l.source) === hover || endId(l.target) === hover);
+  // 터치엔 호버가 없어 탭(선택)도 하이라이트 기준으로 삼는다
+  const focus = hover ?? selected?.id ?? null;
+  const linkTouchesFocus = (l: { source: unknown; target: unknown }) =>
+    focus !== null && (endId(l.source) === focus || endId(l.target) === focus);
 
   const toggle = (k: NodeKind) => {
     const next = new Set(hidden);
@@ -84,7 +87,8 @@ export default function Graph() {
   return (
     <div className="flex h-screen">
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="border-b border-slate-200 bg-white px-6 py-3">
+        <MobileBar title="그래프뷰" subtitle="관계 탐색" />
+        <header className="hidden border-b border-slate-200 bg-white px-6 py-3 md:block">
           <div className="font-bold">그래프뷰</div>
           <div className="text-xs text-slate-400">실험·장비·재료·원인의 관계를 탐색합니다</div>
         </header>
@@ -107,14 +111,14 @@ export default function Graph() {
               graphData={data}
               nodeCanvasObject={(node, ctx, scale) => {
                 const n = node as unknown as GraphNode & { x: number; y: number };
-                const active = !hover || n.id === hover || !!data.adj.get(hover)?.has(n.id);
+                const active = !focus || n.id === focus || !!data.adj.get(focus)?.has(n.id);
                 ctx.globalAlpha = active ? 1 : 0.12;
                 const r = n.kind === "exp" ? 6 : 4;
                 ctx.fillStyle = KIND_COLOR[n.kind];
                 ctx.beginPath();
                 ctx.arc(n.x, n.y, r, 0, 2 * Math.PI);
                 ctx.fill();
-                if (selected?.id === n.id || (hover === n.id && active)) {
+                if (selected?.id === n.id || hover === n.id) {
                   ctx.strokeStyle = "#1e293b";
                   ctx.lineWidth = 1.5 / scale;
                   ctx.stroke();
@@ -141,12 +145,12 @@ export default function Graph() {
                 return esc(n.full);
               }}
               linkColor={(l) => {
-                if (!hover) return "#cbd5e1";
-                return linkTouchesHover(l as { source: unknown; target: unknown })
+                if (!focus) return "#cbd5e1";
+                return linkTouchesFocus(l as { source: unknown; target: unknown })
                   ? "#64748b" : "rgba(203, 213, 225, 0.15)";
               }}
               linkWidth={(l) =>
-                linkTouchesHover(l as { source: unknown; target: unknown }) ? 2 : 1}
+                linkTouchesFocus(l as { source: unknown; target: unknown }) ? 2 : 1}
               onNodeHover={(node) => setHover(node ? (node as unknown as GraphNode).id : null)}
               onNodeClick={(node) => setSelected(node as unknown as GraphNode)}
               onBackgroundClick={() => setSelected(null)}
@@ -156,8 +160,15 @@ export default function Graph() {
       </div>
 
       {selected && (
-        <aside className="w-80 shrink-0 overflow-y-auto border-l border-slate-200 bg-white p-5">
-          <div className="text-xs font-semibold text-slate-400">노드 상세</div>
+        // 모바일: 캔버스를 덮는 바텀 시트 / 데스크톱: 우측 고정 패널
+        <aside className="fixed inset-x-0 bottom-0 z-20 max-h-[55%] overflow-y-auto rounded-t-2xl bg-white p-5 shadow-2xl
+          md:static md:z-auto md:max-h-none md:w-80 md:shrink-0 md:rounded-none md:border-l md:border-slate-200 md:shadow-none">
+          <div className="mx-auto mb-3 h-1 w-9 rounded-full bg-slate-300 md:hidden" />
+          <div className="flex items-start justify-between">
+            <div className="text-xs font-semibold text-slate-400">노드 상세</div>
+            <button onClick={() => setSelected(null)} aria-label="닫기"
+              className="-mt-1 px-2 text-slate-400 md:hidden">✕</button>
+          </div>
           <span className={`mt-3 inline-block rounded-full px-2 py-0.5 text-xs ${KIND_CHIP[selected.kind]}`}>
             {KIND_LABEL[selected.kind]}
           </span>

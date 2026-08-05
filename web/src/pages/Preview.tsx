@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { api } from "../api";
+import { MobileBar } from "../nav";
 import { getSession, saveSession } from "../store";
 import { symptomCategoryLabels } from "../types";
 import type { ParsedLog, RecordDetail } from "../types";
@@ -98,11 +99,13 @@ export default function Preview() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl px-8 py-8">
-      <h1 className="text-2xl font-bold">저장 전 기록 미리보기</h1>
+    <>
+    <MobileBar title="저장 전 미리보기" subtitle={session.title} />
+    <div className="mx-auto max-w-4xl px-5 py-6 md:px-8 md:py-8">
+      <h1 className="text-xl font-bold md:text-2xl">저장 전 기록 미리보기</h1>
       <p className="text-sm text-slate-500">AI가 정리한 내용을 확인하고 수정하세요.</p>
 
-      <div className="mt-6 grid grid-cols-2 gap-4">
+      <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
         <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-5">
           <div className="font-semibold">기본 정보</div>
           <Field label="실험 유형" value={p.experiment_type} onChange={(v) => set({ experiment_type: v })} />
@@ -175,15 +178,16 @@ export default function Preview() {
       </div>
 
       {error && <div className="mt-3 text-sm text-red-600">{error}</div>}
-      <div className="mt-6 flex justify-end gap-3">
-        <button onClick={() => nav(-1)} className="rounded-lg border border-slate-300 bg-white px-5 py-2 text-sm">
+      <div className="mt-6 flex flex-col-reverse gap-3 md:flex-row md:justify-end">
+        <button onClick={() => nav(-1)} className="rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-sm">
           수정하기 (대화로 돌아가기)
         </button>
         <button onClick={onSave} disabled={busy}
-          className="rounded-lg bg-blue-600 px-5 py-2 text-sm font-medium text-white disabled:opacity-40">
+          className="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-medium text-white disabled:opacity-40">
           {busy ? "저장 중..." : "저장하기"}
         </button>
       </div>
     </div>
+    </>
   );
 }

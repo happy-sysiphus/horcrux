@@ -9,17 +9,18 @@ function Row({ label, value }: { label: string; value: string }) {
   ) : null;
 }
 
-export default function StructurePanel({ parsed, gaps, requiredTotal, canSave, onSaveClick, saveLabel }: {
+export default function StructurePanel({ parsed, gaps, requiredTotal, canSave, onSaveClick, saveLabel, className = "" }: {
   parsed: ParsedLog | null;
   gaps: string[];          // 마지막 파싱 기준 누락 항목 전체 (게이지 분자 계산)
   requiredTotal: number;
   canSave: boolean;        // 질문 루프 소진 또는 재질문 라운드 소진
   onSaveClick: () => void;
   saveLabel: string;
+  className?: string;      // 모바일 탭 전환용 표시/숨김
 }) {
   const done = Math.max(requiredTotal - gaps.length, 0);
   return (
-    <div className="flex h-full w-80 shrink-0 flex-col border-l border-slate-200 bg-white p-5">
+    <div className={`min-h-0 w-full flex-1 flex-col border-slate-200 bg-white p-5 md:h-full md:w-80 md:flex-none md:shrink-0 md:border-l ${className}`}>
       <div className="text-lg font-bold">연구 기록</div>
       <div className="text-xs text-slate-400">실시간으로 구조화됩니다.</div>
       <div className="flex-1 overflow-y-auto">

@@ -1,6 +1,7 @@
 import { Fragment, type ReactNode } from "react";
 import { HashRouter, Route, Routes, useParams } from "react-router-dom";
 import Sidebar from "./components/Sidebar";
+import { NavProvider } from "./nav";
 import Ask from "./pages/Ask";
 import FollowUp from "./pages/FollowUp";
 import Graph from "./pages/Graph";
@@ -19,6 +20,7 @@ function BySid({ children }: { children: ReactNode }) {
 export default function App() {
   return (
     <HashRouter>
+      <NavProvider>
       <div className="flex h-screen bg-slate-50 text-slate-900">
         <Sidebar />
         <main className="min-w-0 flex-1 overflow-y-auto">
@@ -34,6 +36,7 @@ export default function App() {
           </Routes>
         </main>
       </div>
+      </NavProvider>
     </HashRouter>
   );
 }

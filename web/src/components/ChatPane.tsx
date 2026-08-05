@@ -33,7 +33,7 @@ export default function ChatPane({ messages, onSend, busy, placeholder, onRewind
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex-1 space-y-4 overflow-y-auto p-6">
+      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4 md:p-6">
         {rows.map(({ m, i, uIdx }) => (
           <div key={i} className="group">
             <div className={`text-xs text-slate-400 ${m.role === "user" ? "text-right" : ""}`}>
@@ -44,8 +44,9 @@ export default function ChatPane({ messages, onSend, busy, placeholder, onRewind
               : "w-fit max-w-[85%] rounded-xl border-l-4 border-blue-500 bg-white px-4 py-3 text-sm shadow-sm whitespace-pre-wrap"}>
               {m.text}
             </div>
+            {/* 터치엔 호버가 없어 모바일은 상시 노출, 데스크톱만 호버로 드러낸다 */}
             {m.role === "user" && uIdx >= 1 && !busy && (onRewind || onFork) && (
-              <div className="mt-1 flex justify-end gap-3 opacity-0 transition-opacity group-hover:opacity-100">
+              <div className="mt-1 flex justify-end gap-3 transition-opacity md:opacity-0 md:group-hover:opacity-100">
                 {onRewind && (
                   <button onClick={() => onRewind(uIdx)}
                     className="text-xs text-slate-400 hover:text-blue-600">↩ 이 답변 전으로 되감기</button>
@@ -71,7 +72,7 @@ export default function ChatPane({ messages, onSend, busy, placeholder, onRewind
         {busy && <div className="text-sm text-slate-400 animate-pulse">분석 중... (수십 초 걸릴 수 있어요)</div>}
         <div ref={bottom} />
       </div>
-      <div className="border-t border-slate-200 bg-white p-4">
+      <div className="shrink-0 border-t border-slate-200 bg-white p-3 md:p-4">
         <div className="flex items-center gap-2 rounded-full border border-slate-300 px-4 py-2">
           <input value={text} onChange={(e) => setText(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && send(text)}

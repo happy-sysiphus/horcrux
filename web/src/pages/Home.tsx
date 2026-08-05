@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { MobileBar } from "../nav";
 import { listSessions, newSession, saveSession } from "../store";
 
 export default function Home() {
@@ -19,9 +20,11 @@ export default function Home() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl px-8 py-16">
-      <h1 className="text-3xl font-bold">무엇을 도와드릴까요?</h1>
-      <p className="mt-2 text-slate-500">실험 기록, 문제 원인, 과거 사례를 자연어로 입력하면 AI가 정리합니다.</p>
+    <>
+    <MobileBar title="AI 워크스페이스" />
+    <div className="mx-auto max-w-3xl px-5 py-10 md:px-8 md:py-16">
+      <h1 className="text-2xl font-bold md:text-3xl">무엇을 도와드릴까요?</h1>
+      <p className="mt-2 text-sm text-slate-500 md:text-base">실험 기록, 문제 원인, 과거 사례를 자연어로 입력하면 AI가 정리합니다.</p>
 
       <div className="mt-8 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
         <div className="mb-3 flex gap-1 rounded-lg bg-slate-100 p-1 text-sm w-fit">
@@ -67,5 +70,6 @@ export default function Home() {
         </div>
       )}
     </div>
+    </>
   );
 }
