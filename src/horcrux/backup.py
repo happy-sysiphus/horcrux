@@ -23,16 +23,19 @@ def upload_backup(storage, zip_path: Path) -> None:
                    {"content-type": "application/zip", "upsert": "true"})
 
 
-def start_backup_thread(deploy, interval_sec: int = 86400) -> threading.Thread:
+def start_backup_thread(deploy, interval_sec: int = 86400,
+                        first_delay_sec: int = 60) -> threading.Thread:
     def loop():
+        # 재배포마다 컨테이너가 재시작돼 타이머가 리셋된다 — 첫 백업은 기동 직후에 한 번
+        time.sleep(first_delay_sec)
         while True:
-            time.sleep(interval_sec)
             try:
                 z = make_backup_zip(deploy.data_dir)
                 upload_backup(deploy.db._c.storage.from_("vault-backups"), z)
                 print(f"백업 업로드: {z.name}")
             except Exception as e:   # 백업 실패는 서비스 영향 없음 — 다음 주기 재시도
                 print(f"(백업 실패 — 다음 주기 재시도: {e})")
+            time.sleep(interval_sec)
 
     t = threading.Thread(target=loop, daemon=True)
     t.start()

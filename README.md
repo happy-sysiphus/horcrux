@@ -102,6 +102,8 @@ required_parameters:
    - `ANTHROPIC_API_KEY`, `HORCRUX_MODEL` — 중앙 LLM 모드 기본 키·모델명
    - `CRED_ENCRYPTION_KEY` — 연구실 자체 크레덴셜 암호화용 Fernet 키 (생성법 아래)
    - `DATA_DIR` — 볼트 저장 경로 (기본 `/data`, 위 볼륨 마운트 경로와 맞출 것)
+   - `HORCRUX_WEB_DIST` — 프론트 빌드 산출물 경로. `Dockerfile`이 `/app/web/dist`로
+     이미 설정하므로 Railway에서는 손댈 필요 없다 (미설정 시 소스 체크아웃 상대경로)
 
 `CRED_ENCRYPTION_KEY`는 Fernet 키다:
 

@@ -13,5 +13,7 @@ COPY web/dist ./web/dist
 RUN pip install --no-cache-dir ".[web,deploy]"
 
 ENV DATA_DIR=/data
+# 비편집 설치라 소스 상대경로로는 web/dist를 찾지 못한다 — 복사한 위치를 명시
+ENV HORCRUX_WEB_DIST=/app/web/dist
 EXPOSE 8765
 CMD ["horcrux", "serve", "--host", "0.0.0.0"]

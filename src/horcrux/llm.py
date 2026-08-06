@@ -27,10 +27,13 @@ def _exe(name: str) -> str:
 
 
 def _run(cmd: list[str], prompt: str, env: dict[str, str] | None = None) -> str:
+    if env:
+        # 연구실 자체 크레덴셜 사용 — 중앙 ANTHROPIC_API_KEY가 상속되면 claude CLI가
+        # 그쪽을 우선해 중앙 키로 과금된다. 상속 목록에서 제거 후 연구실 값 주입.
+        env = {k: v for k, v in os.environ.items() if k != "ANTHROPIC_API_KEY"} | env
     p = subprocess.Popen(
         cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-        text=True, encoding="utf-8",
-        env={**os.environ, **env} if env else None,
+        text=True, encoding="utf-8", env=env,
     )
     try:
         out, err = p.communicate(prompt, timeout=_TIMEOUT)

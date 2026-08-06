@@ -24,7 +24,8 @@ class FakeDB:
 
     def create_lab(self, user_id, name):
         lab = {"id": f"lab-{len(self.labs)+1}", "name": name, "invite_code": "abcd1234",
-               "llm_mode": "central", "llm_provider": None, "daily_llm_limit": 200}
+               "llm_mode": "central", "llm_provider": None, "daily_llm_limit": 200,
+               "llm_credential": "gAAAAA-fernet-ciphertext"}  # 실제 스키마와 동일 — 응답 유출 감시용
         self.labs[lab["id"]] = lab
         self.members[user_id] = (lab["id"], "admin")
         return lab
@@ -116,6 +117,39 @@ def test_usage_limit_429(deploy_client):
     db.usage_ok = False
     r = client.post("/api/ask", json={"text": "q"}, headers=auth(tok()))
     assert r.status_code == 429
+
+
+def test_feedback_record_id_cannot_escape_own_vault(deploy_client, tmp_path):
+    from horcrux.records import ExperimentRecord, record_path, save_record
+
+    client, db = deploy_client
+    client.post("/api/labs", json={"name": "A"}, headers=auth(tok("u1")))
+    client.post("/api/labs", json={"name": "B"}, headers=auth(tok("u2")))
+    victim_vault = tmp_path / "vaults" / db.members["u2"][0]
+    rec = ExperimentRecord(id="2026-08-01_x-001", date="2026-08-01")
+    save_record(victim_vault, rec, "원문", "정리")
+    before = record_path(victim_vault, rec.id).read_text(encoding="utf-8")
+
+    r = client.post("/api/feedback",
+                    json={"record_id": f"../../../{db.members['u2'][0]}/raw/experiments/{rec.id}",
+                          "resolved": True, "cause": "탈취"},
+                    headers=auth(tok("u1")))
+    assert 400 <= r.status_code < 500
+    assert record_path(victim_vault, rec.id).read_text(encoding="utf-8") == before
+
+
+def test_lab_response_hides_credential_and_member_invite(deploy_client):
+    client, db = deploy_client
+    created = client.post("/api/labs", json={"name": "A"}, headers=auth(tok("u1"))).json()["lab"]
+    assert "llm_credential" not in created
+    assert created["invite_code"] == "abcd1234"          # 관리자는 초대 코드가 필요
+    joined = client.post("/api/labs/join", json={"invite_code": "abcd1234"},
+                         headers=auth(tok("u2"))).json()["lab"]
+    assert "llm_credential" not in joined and "invite_code" not in joined
+    member = client.get("/api/labs/me", headers=auth(tok("u2"))).json()["lab"]
+    assert "llm_credential" not in member and "invite_code" not in member
+    admin = client.get("/api/labs/me", headers=auth(tok("u1"))).json()["lab"]
+    assert "llm_credential" not in admin and admin["invite_code"] == "abcd1234"
 
 
 def test_settings_admin_only(deploy_client):

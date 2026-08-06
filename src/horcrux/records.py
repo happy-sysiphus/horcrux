@@ -53,6 +53,10 @@ def records_dir(vault: Path) -> Path:
 
 
 def record_path(vault: Path, record_id: str) -> Path:
+    # record_id는 외부 입력(API 본문·CLI 인자) — 구분자가 섞이면 볼트 밖으로 새어나간다
+    if (not record_id or "/" in record_id or "\\" in record_id or ".." in record_id
+            or Path(record_id).name != record_id):
+        raise ValueError(f"레코드 id가 올바르지 않습니다: {record_id!r}")
     return records_dir(vault) / f"{record_id}.md"
 
 

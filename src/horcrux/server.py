@@ -98,6 +98,27 @@ def _meta(rec) -> dict:
     return {k: d[k] for k in _META_KEYS}
 
 
+def _existing_record(vault: Path, record_id: str) -> Path:
+    """볼트 안의 실재 레코드 경로. 없거나 id가 부정하면 404 (트레이스백 노출 금지)."""
+    try:
+        p = record_path(vault, record_id)
+    except ValueError:
+        raise HTTPException(404, f"레코드 없음: {record_id}") from None
+    if not p.exists():
+        raise HTTPException(404, f"레코드 없음: {record_id}")
+    return p
+
+
+def _lab_out(lab: dict | None, role: str | None) -> dict | None:
+    """클라이언트에 나가는 연구실 필드 화이트리스트 — llm_credential은 절대 포함하지 않는다."""
+    if lab is None:
+        return None
+    out = {k: lab.get(k) for k in ("id", "name", "llm_mode", "llm_provider", "daily_llm_limit")}
+    if role == "admin":
+        out["invite_code"] = lab.get("invite_code")
+    return out
+
+
 def create_app(cfg: Config, deploy: DeployCtx | None = None) -> FastAPI:
     app = FastAPI(title="LAB GENE")
 
@@ -197,17 +218,13 @@ def create_app(cfg: Config, deploy: DeployCtx | None = None) -> FastAPI:
     @app.get("/api/records/{record_id}")
     def api_detail(record_id: str, ctx=Depends(require_lab)):
         c = lab_cfg(ctx)
-        p = record_path(c.vault, record_id)
-        if not p.exists():
-            raise HTTPException(404, f"레코드 없음: {record_id}")
-        rec, body = load_record(p)
+        rec, body = load_record(_existing_record(c.vault, record_id))
         return {"record": rec.model_dump(), "body": body}
 
     @app.post("/api/feedback")
     def api_feedback(inp: FeedbackIn, ctx=Depends(require_lab)):
         c = lab_cfg(ctx)
-        if not record_path(c.vault, inp.record_id).exists():
-            raise HTTPException(404, f"레코드 없음: {inp.record_id}")
+        _existing_record(c.vault, inp.record_id)
         with lab_lock(ctx):
             msg = run_feedback(c, inp.record_id, inp.resolved, inp.cause, inp.note)
         return {"message": msg}
@@ -228,7 +245,7 @@ def create_app(cfg: Config, deploy: DeployCtx | None = None) -> FastAPI:
             raise HTTPException(409, "이미 소속 연구실이 있습니다")
         lab = deploy.db.create_lab(ctx.user_id, inp.name)
         (deploy.data_dir / "vaults" / lab["id"]).mkdir(parents=True, exist_ok=True)
-        return {"lab": lab, "role": "admin"}
+        return {"lab": _lab_out(lab, "admin"), "role": "admin"}
 
     @app.post("/api/labs/join")
     def api_lab_join(inp: JoinIn, ctx=Depends(get_ctx)):
@@ -240,11 +257,13 @@ def create_app(cfg: Config, deploy: DeployCtx | None = None) -> FastAPI:
             lab = deploy.db.join_lab(ctx.user_id, inp.invite_code)
         except LookupError:
             raise HTTPException(404, "초대 코드가 올바르지 않습니다")
-        return {"lab": lab, "role": "member"}
+        return {"lab": _lab_out(lab, "member"), "role": "member"}
 
     @app.get("/api/labs/me")
     def api_lab_me(ctx=Depends(require_lab)):
-        return {"lab": ctx.lab, "role": ctx.role} if ctx else {"lab": None, "role": None}
+        if ctx is None:
+            return {"lab": None, "role": None}
+        return {"lab": _lab_out(ctx.lab, ctx.role), "role": ctx.role}
 
     @app.put("/api/labs/settings")
     def api_lab_settings(inp: SettingsIn, ctx=Depends(require_lab)):
@@ -265,8 +284,9 @@ def create_app(cfg: Config, deploy: DeployCtx | None = None) -> FastAPI:
             deploy.db.update_settings(ctx.lab["id"], fields)
         return {"ok": True}
 
-    # 소스 체크아웃(-e 설치) 기준 경로 — 1차 데모 전제. wheel/exe 배포는 2차에서 패키지 데이터로 포함
-    dist = Path(__file__).resolve().parents[2] / "web" / "dist"
+    # 기본은 소스 체크아웃(-e 설치) 기준 경로. 비편집 설치(Docker)는 HORCRUX_WEB_DIST로 지정
+    dist = Path(os.environ.get("HORCRUX_WEB_DIST")
+                or Path(__file__).resolve().parents[2] / "web" / "dist")
     if dist.exists():  # 빌드 전엔 API만 (개발은 vite dev + proxy)
         app.mount("/", StaticFiles(directory=dist, html=True), name="web")
     return app

@@ -28,6 +28,9 @@ class FakeTable:
         if self._op == "update":
             for r in matched: r.update(self._payload)
         if self._op == "upsert":
+            # 실제 postgres on-conflict와 동일하게 PK로 매칭 (llm_usage PK = lab_id+day)
+            pk = ("lab_id", "day")
+            matched = [r for r in rows if all(r.get(k) == self._payload[k] for k in pk)]
             if matched: matched[0].update(self._payload)
             else: rows.append(dict(self._payload)); matched = [rows[-1]]
         return type("R", (), {"data": matched})
@@ -73,6 +76,10 @@ def test_credential_roundtrip_encrypted(db):
 
 def test_bump_usage_enforces_limit(db):
     lab = db.create_lab("u", "랩")
+    other = db.create_lab("u2", "다른 랩")
     assert db.bump_usage(lab["id"], limit=2) is True
     assert db.bump_usage(lab["id"], limit=2) is True
     assert db.bump_usage(lab["id"], limit=2) is False   # 3회째 = 초과
+    # 카운터는 연구실별로 독립 — 한 랩이 소진해도 다른 랩은 영향 없음
+    assert db.bump_usage(other["id"], limit=2) is True
+    assert db.bump_usage(lab["id"], limit=2) is False

@@ -1,3 +1,4 @@
+import os
 import subprocess
 from pathlib import Path
 
@@ -289,9 +290,16 @@ def test_run_merges_extra_env(monkeypatch):
         return P()
 
     monkeypatch.setattr(llm.subprocess, "Popen", fake_popen)
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "중앙키")
     llm._run(["x"], "p", env={"CLAUDE_CODE_OAUTH_TOKEN": "tok"})
     assert captured["env"]["CLAUDE_CODE_OAUTH_TOKEN"] == "tok"
     assert "PATH" in captured["env"]  # os.environ 병합 확인
+    # 연구실 자체 크레덴셜을 쓸 땐 중앙 키가 우선하면 안 됨 (중앙 과금 방지)
+    assert "ANTHROPIC_API_KEY" not in captured["env"]
+
+    llm._run(["x"], "p")   # 중앙 모드는 그대로 상속 (env=None → os.environ)
+    assert captured["env"] is None
+    assert os.environ["ANTHROPIC_API_KEY"] == "중앙키"
 
 
 def test_generate_passes_extra_env(fake_run):
