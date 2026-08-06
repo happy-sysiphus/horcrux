@@ -62,6 +62,13 @@ Supabase → **SQL Editor → New query** 에 이 저장소의 [`db/schema.sql`]
 그대로 붙여넣고 **Run**. `labs` / `lab_members` / `llm_usage` 3개 테이블이 생기면 끝이다.
 (서버는 `service_role` 키로 접근하므로 RLS 정책은 지금 단계에서 필요 없다.)
 
+이어서 **백업 버킷**을 만든다. Supabase → **Storage → New bucket**,
+이름은 정확히 `vault-backups`, **Public 은 끈 채로**(볼트 원문이 들어간다) 생성.
+
+서버는 기동 60초 뒤와 이후 24시간마다 볼트 전체를 zip으로 이 버킷에 올린다
+(`src/horcrux/backup.py`). 버킷이 없으면 서비스는 정상 동작하지만 백업만 조용히
+실패하고 서버 로그에 `(백업 실패 — 다음 주기 재시도: ...)` 가 찍힌다.
+
 ---
 
 ## 5. 로컬에서 배포 모드로 검증 (여기까지가 이번 작업의 끝선)
