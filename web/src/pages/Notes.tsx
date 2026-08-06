@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { api } from "../api";
 import FeedbackModal from "../components/FeedbackModal";
 import { resolutionLabel } from "../components/RecordCard";
+import ReferencesSection from "../components/ReferencesSection";
 import { MobileBar } from "../nav";
 import { newSession, saveSession } from "../store";
 import { symptomCategoryLabels } from "../types";
@@ -124,6 +125,11 @@ export default function Notes() {
                   ))}
                 </div>
               )}
+              <ReferencesSection recordId={detail.record.id}
+                references={detail.record.references ?? []}
+                records={records.filter((r) => r.id !== detail.record.id)}
+                onSaved={() => { api.getRecord(detail.record.id).then(setDetail).catch(() => {}); void loadList(); }}
+                onOpenRecord={(rid) => nav(`/notes/${rid}`)} />
               <div className="mt-4">
                 <div className="font-semibold">본문</div>
                 <pre className="mt-2 overflow-x-auto whitespace-pre-wrap rounded-xl bg-white p-4 text-sm shadow-sm">{detail.body}</pre>
