@@ -1,5 +1,6 @@
 import { Fragment, type ReactNode } from "react";
 import { HashRouter, Route, Routes, useParams } from "react-router-dom";
+import { AuthProvider, resolveRoute, useAuth } from "./auth";
 import Sidebar from "./components/Sidebar";
 import { NavProvider } from "./nav";
 import Ask from "./pages/Ask";
@@ -7,7 +8,9 @@ import FollowUp from "./pages/FollowUp";
 import Graph from "./pages/Graph";
 import Home from "./pages/Home";
 import LogChat from "./pages/LogChat";
+import Login from "./pages/Login";
 import Notes from "./pages/Notes";
+import Onboarding from "./pages/Onboarding";
 import Preview from "./pages/Preview";
 
 // 같은 route 안에서 :sid만 바뀌면 React가 컴포넌트를 remount하지 않아 훅 내부 세션 상태와
@@ -17,9 +20,22 @@ function BySid({ children }: { children: ReactNode }) {
   return <Fragment key={sid}>{children}</Fragment>;
 }
 
+// 로그인·온보딩은 라우트가 아니라 앱 셸 자체를 대체한다 — 어느 해시 경로로 들어와도 같게 걸린다
+function Gate({ children }: { children: ReactNode }) {
+  const { mode, session, me } = useAuth();
+  const route = resolveRoute(mode, !!session, !!me?.lab);
+  if (route === "loading")
+    return <div className="flex h-screen items-center justify-center text-slate-400">불러오는 중...</div>;
+  if (route === "login") return <Login />;
+  if (route === "onboarding") return <Onboarding />;
+  return <>{children}</>;
+}
+
 export default function App() {
   return (
     <HashRouter>
+      <AuthProvider>
+      <Gate>
       <NavProvider>
       <div className="flex h-screen bg-slate-50 text-slate-900">
         <Sidebar />
@@ -37,6 +53,8 @@ export default function App() {
         </main>
       </div>
       </NavProvider>
+      </Gate>
+      </AuthProvider>
     </HashRouter>
   );
 }

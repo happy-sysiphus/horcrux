@@ -62,6 +62,20 @@ export interface AppConfig {
   provider: string; vault: string;
 }
 
+export interface AuthConfig {
+  deploy: boolean; supabase_url: string | null; supabase_anon_key: string | null;
+}
+export interface Lab {
+  id: string; name: string; llm_mode: "central" | "own";
+  llm_provider: string | null; daily_llm_limit: number;
+  invite_code?: string;   // 관리자에게만 내려온다
+}
+export interface LabMember { user_id: string; email: string; role: string }
+export interface LabMe {
+  lab: Lab | null; role: "admin" | "member" | null;
+  usage_today: number; members?: LabMember[];
+}
+
 export interface ChatMsg { role: "user" | "ai"; text: string; chips?: string[] }
 // 사용자 발화 직전의 대화 상태 — 되감기·포크의 복원 지점
 export interface ConvoSnapshot {

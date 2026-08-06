@@ -282,8 +282,10 @@ def create_app(cfg: Config, deploy: DeployCtx | None = None) -> FastAPI:
         return {"lab": _lab_out(lab, "member"), "role": "member"}
 
     @app.get("/api/labs/me")
-    def api_lab_me(ctx=Depends(require_lab)):
-        if ctx is None:
+    def api_lab_me(ctx=Depends(get_ctx)):
+        # require_lab이 아니라 get_ctx — 무소속도 200(lab=null)으로 답해야
+        # 프론트가 "온보딩 필요"와 "서버 오류"를 구분한다
+        if ctx is None or ctx.lab is None:
             return {"lab": None, "role": None, "usage_today": 0}
         out = {"lab": _lab_out(ctx.lab, ctx.role), "role": ctx.role,
                "usage_today": deploy.db.get_usage(ctx.lab["id"])}

@@ -1,12 +1,26 @@
-import type { AppConfig, AskResult, ParsedLog, RecordDetail, RecordMeta, Reference } from "./types";
+import type {
+  AppConfig, AskResult, AuthConfig, Lab, LabMe, ParsedLog, RecordDetail, RecordMeta, Reference,
+} from "./types";
+
+// AuthProvider가 등록한다 — api.ts가 Supabase나 라우터를 직접 알지 않게
+let getToken: () => Promise<string | null> = async () => null;
+let onAuthError: (status: 401 | 403) => void = () => {};
+export function registerAuth(t: typeof getToken, e: typeof onAuthError) {
+  getToken = t; onAuthError = e;
+}
 
 async function http<T>(method: string, url: string, body?: unknown): Promise<T> {
+  const token = await getToken();
   const res = await fetch(url, {
     method,
-    headers: body ? { "Content-Type": "application/json" } : undefined,
+    headers: {
+      ...(body ? { "Content-Type": "application/json" } : {}),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
     body: body ? JSON.stringify(body) : undefined,
   });
   if (!res.ok) {
+    if (res.status === 401 || res.status === 403) onAuthError(res.status);
     const detail = await res.json().catch(() => ({}));
     throw new Error((detail as { detail?: string }).detail ?? `요청 실패 (${res.status})`);
   }
@@ -30,4 +44,13 @@ export const api = {
   putReferences: (recordId: string, references: Reference[]) =>
     http<{ record: RecordMeta }>("PUT", `/api/records/${recordId}/references`, { references }),
   config: () => http<AppConfig>("GET", "/api/config"),
+  authConfig: () => http<AuthConfig>("GET", "/api/auth-config"),
+  labMe: () => http<LabMe>("GET", "/api/labs/me"),
+  labCreate: (name: string) => http<{ lab: Lab; role: string }>("POST", "/api/labs", { name }),
+  labJoin: (invite_code: string) =>
+    http<{ lab: Lab; role: string }>("POST", "/api/labs/join", { invite_code }),
+  labSettings: (patch: Partial<{
+    name: string; daily_llm_limit: number; llm_mode: string;
+    llm_provider: string; llm_credential: string; rotate_invite: boolean;
+  }>) => http<{ ok: boolean }>("PUT", "/api/labs/settings", patch),
 };
