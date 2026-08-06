@@ -243,6 +243,14 @@ def create_app(cfg: Config, deploy: DeployCtx | None = None) -> FastAPI:
             write_md(p, rec.model_dump(), body)  # body 보존 — update_resolution과 동일
         return {"record": _meta(rec)}
 
+    @app.get("/api/auth-config")
+    def api_auth_config():
+        # 유일한 무인증 엔드포인트 — 프론트가 로그인 전에 Supabase를 초기화해야 한다.
+        # anon key는 브라우저에 노출되는 것이 전제인 공개 값(RLS가 실제 방어).
+        return {"deploy": deploy is not None,
+                "supabase_url": os.environ.get("SUPABASE_URL"),
+                "supabase_anon_key": os.environ.get("SUPABASE_ANON_KEY")}
+
     @app.get("/api/config")
     def api_config(ctx=Depends(require_lab)):
         c = lab_cfg(ctx)
@@ -276,8 +284,12 @@ def create_app(cfg: Config, deploy: DeployCtx | None = None) -> FastAPI:
     @app.get("/api/labs/me")
     def api_lab_me(ctx=Depends(require_lab)):
         if ctx is None:
-            return {"lab": None, "role": None}
-        return {"lab": _lab_out(ctx.lab, ctx.role), "role": ctx.role}
+            return {"lab": None, "role": None, "usage_today": 0}
+        out = {"lab": _lab_out(ctx.lab, ctx.role), "role": ctx.role,
+               "usage_today": deploy.db.get_usage(ctx.lab["id"])}
+        if ctx.role == "admin":
+            out["members"] = deploy.db.list_members(ctx.lab["id"])
+        return out
 
     @app.put("/api/labs/settings")
     def api_lab_settings(inp: SettingsIn, ctx=Depends(require_lab)):

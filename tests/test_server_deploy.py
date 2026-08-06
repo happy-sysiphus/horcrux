@@ -56,6 +56,13 @@ class FakeDB:
     def bump_usage(self, lab_id, limit):
         return self.usage_ok
 
+    def get_usage(self, lab_id):
+        return 3
+
+    def list_members(self, lab_id):
+        return [{"user_id": u, "email": f"{u}@lab.test", "role": r}
+                for u, (lid, r) in self.members.items() if lid == lab_id]
+
 
 @pytest.fixture
 def deploy_client(tmp_path):
@@ -150,6 +157,26 @@ def test_lab_response_hides_credential_and_member_invite(deploy_client):
     assert "llm_credential" not in member and "invite_code" not in member
     admin = client.get("/api/labs/me", headers=auth(tok("u1"))).json()["lab"]
     assert "llm_credential" not in admin and admin["invite_code"] == "abcd1234"
+
+
+def test_auth_config_is_public(deploy_client, monkeypatch):
+    client, _ = deploy_client
+    monkeypatch.setenv("SUPABASE_URL", "https://x.supabase.co")
+    monkeypatch.setenv("SUPABASE_ANON_KEY", "anon")
+    r = client.get("/api/auth-config")  # 토큰 없이도 200이어야 프론트가 부팅한다
+    assert r.status_code == 200
+    assert r.json() == {"deploy": True, "supabase_url": "https://x.supabase.co",
+                        "supabase_anon_key": "anon"}
+
+
+def test_lab_me_usage_and_members(deploy_client):
+    client, _ = deploy_client
+    client.post("/api/labs", json={"name": "랩"}, headers=auth(tok("u1")))
+    client.post("/api/labs/join", json={"invite_code": "abcd1234"}, headers=auth(tok("u2")))
+    admin = client.get("/api/labs/me", headers=auth(tok("u1"))).json()
+    assert admin["usage_today"] == 3
+    assert {m["role"] for m in admin["members"]} == {"admin", "member"}
+    assert "members" not in client.get("/api/labs/me", headers=auth(tok("u2"))).json()
 
 
 def test_settings_admin_only(deploy_client):

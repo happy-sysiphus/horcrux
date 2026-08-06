@@ -58,6 +58,23 @@ class LabsDB:
         return labs[0]["llm_provider"], self._fernet.decrypt(
             labs[0]["llm_credential"].encode()).decode()
 
+    def get_usage(self, lab_id: str) -> int:
+        day = datetime.date.today().isoformat()
+        rows = (self._c.table("llm_usage").select("*")
+                .eq("lab_id", lab_id).eq("day", day).execute().data)
+        return rows[0]["count"] if rows else 0
+
+    def list_members(self, lab_id: str) -> list[dict]:
+        ms = self._c.table("lab_members").select("*").eq("lab_id", lab_id).execute().data
+        out = []
+        for m in ms:
+            try:
+                email = self._c.auth.admin.get_user_by_id(m["user_id"]).user.email or m["user_id"]
+            except Exception:      # auth 조회가 실패해도 멤버 목록 자체는 나가게
+                email = m["user_id"]
+            out.append({"user_id": m["user_id"], "email": email, "role": m["role"]})
+        return out
+
     # ponytail: read-then-write라 동시 요청에 근사 카운트 — 정확 카운트 필요하면 postgres rpc increment로 교체
     def bump_usage(self, lab_id: str, limit: int) -> bool:
         day = datetime.date.today().isoformat()

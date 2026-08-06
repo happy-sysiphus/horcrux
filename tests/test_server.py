@@ -96,6 +96,14 @@ def test_legacy_record_without_references_key(client):
     assert c.get("/api/records").json()["records"][0]["references"] == []
 
 
+def test_auth_config_local(client, monkeypatch):
+    c, _ = client
+    monkeypatch.delenv("SUPABASE_URL", raising=False)
+    monkeypatch.delenv("SUPABASE_ANON_KEY", raising=False)
+    j = c.get("/api/auth-config").json()
+    assert j == {"deploy": False, "supabase_url": None, "supabase_anon_key": None}
+
+
 def test_config_endpoint(client):
     c, _ = client
     j = c.get("/api/config").json()
