@@ -274,4 +274,9 @@ def create_app(cfg: Config, deploy: DeployCtx | None = None) -> FastAPI:
 
 def run_serve(cfg: Config, host: str = "127.0.0.1", port: int = 8765) -> None:
     import uvicorn
-    uvicorn.run(create_app(cfg, load_deploy_ctx()), host=host, port=port)
+    from .backup import start_backup_thread
+
+    deploy = load_deploy_ctx()
+    if deploy is not None:
+        start_backup_thread(deploy)
+    uvicorn.run(create_app(cfg, deploy), host=host, port=port)
