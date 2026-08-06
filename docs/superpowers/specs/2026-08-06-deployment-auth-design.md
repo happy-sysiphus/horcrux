@@ -78,8 +78,9 @@ UI는 1인 1연구실이지만 lab_members가 다대다라 다중 소속은 나�
   API 키를 등록 → Fernet 암호화해 labs.llm_credential 저장 → 호출 시 subprocess env
   주입(claude: `CLAUDE_CODE_OAUTH_TOKEN`, api: 키 교체). 등록은 운영자 대행 가능.
   크레덴셜 실패(만료 등) 시 그 연구실에 "재등록 필요" 에러 반환.
-- **사용량 상한**: LLM 호출 1회마다 llm_usage upsert 증가. `daily_llm_limit` 초과 시
-  429 + 안내 메시지(관리자에게 상한 상향/자기 크레덴셜 전환 안내). 중앙 키 보호 장치.
+- **사용량 상한**: LLM 유발 API 요청(parse/ask/records) 1건마다 llm_usage upsert 증가.
+  `daily_llm_limit` 초과 시 429 + 안내 메시지(관리자에게 상한 상향/자기 크레덴셜 전환 안내).
+  중앙 키 보호 장치.
 
 ## 서버 환경변수
 
