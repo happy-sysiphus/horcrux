@@ -199,7 +199,7 @@ git add -A && git commit -m "feat: llm CLI 호출에 연구실별 크레덴셜 e
 ### Task 4: labs.py — Supabase DB 래퍼 + 크레덴셜 암호화
 
 **Files:**
-- Create: `src/horcrux/labs.py`, `tests/test_labs.py`, `supabase/schema.sql`
+- Create: `src/horcrux/labs.py`, `tests/test_labs.py`, `db/schema.sql`
 
 **Interfaces:**
 - Consumes: supabase-py `create_client(url, key)` — 테스트는 전부 페이크 클라이언트
@@ -218,7 +218,7 @@ class LabsDB:
 def new_invite_code() -> str                                     # secrets.token_hex(4) 8자
 ```
 
-- [ ] **Step 1: `supabase/schema.sql` 작성** (Supabase SQL 에디터에서 수동 1회 실행 — 파일럿 규모라 마이그레이션 도구 없음)
+- [ ] **Step 1: `db/schema.sql` 작성** (Supabase SQL 에디터에서 수동 1회 실행 — 파일럿 규모라 마이그레이션 도구 없음)
 
 ```sql
 create table labs (
@@ -982,7 +982,7 @@ CMD ["horcrux", "serve", "--host", "0.0.0.0"]
 Run: `docker build -t horcrux . && docker run --rm horcrux python -c "import horcrux.server"`
 Expected: 빌드 성공
 
-- [ ] **Step 4: README 배포 절 추가** — 내용: Railway 프로젝트 생성(GitHub 연동, 볼륨 `/data` 마운트), Supabase 프로젝트 생성 → `supabase/schema.sql` SQL 에디터 실행 → Auth에서 구글 provider 켜기 → legacy JWT secret 발급, Railway 환경변수 목록(Global Constraints의 8개), 중앙 모드 기본·연구실 크레덴셜 등록 절차(관리자 화면 또는 운영자 대행 — `claude setup-token` 안내).
+- [ ] **Step 4: README 배포 절 추가** — 내용: Railway 프로젝트 생성(GitHub 연동, 볼륨 `/data` 마운트), Supabase 프로젝트 생성 → `db/schema.sql` SQL 에디터 실행 → Auth에서 구글 provider 켜기 → legacy JWT secret 발급, Railway 환경변수 목록(Global Constraints의 8개), 중앙 모드 기본·연구실 크레덴셜 등록 절차(관리자 화면 또는 운영자 대행 — `claude setup-token` 안내).
 
 - [ ] **Step 5: Commit**
 

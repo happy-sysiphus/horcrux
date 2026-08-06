@@ -7,10 +7,7 @@ from cryptography.fernet import Fernet
 
 try:
     from supabase import create_client
-except ImportError:      # deploy extra 미설치 로컬 — LabsDB 생성 시점에만 필요
-    # ModuleNotFoundError가 아니라 ImportError를 잡는 이유: 저장소 루트의 supabase/
-    # (schema.sql 보관용) 디렉터리가 네임스페이스 패키지로 잡혀 실제 supabase 패키지가
-    # 없을 때 "cannot import name 'create_client'" ImportError가 발생하기 때문.
+except ModuleNotFoundError:      # deploy extra 미설치 로컬 — LabsDB 생성 시점에만 필요
     create_client = None
 
 
