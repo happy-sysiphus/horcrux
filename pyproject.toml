@@ -6,7 +6,6 @@ requires-python = ">=3.10"
 dependencies = [
     "pydantic>=2",
     "pyyaml",
-    "discord.py>=2.6",
 ]
 
 [project.optional-dependencies]

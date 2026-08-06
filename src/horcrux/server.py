@@ -15,7 +15,7 @@ from .feedback import run_feedback
 from .ingest import ParsedLog, missing_required, parse_log, save_unparsed, to_record
 from .records import list_records, load_record, record_path, save_record
 
-# ponytail: bot.py와 같은 전역 볼트 쓰기 락 — 저장 id 순번 경쟁 방지 (로컬 단일 사용자)
+# ponytail: 전역 볼트 쓰기 락 — 저장 id 순번 경쟁 방지 (로컬 단일 사용자)
 _VAULT_LOCK = threading.Lock()
 
 _META_KEYS = ("id", "date", "experiment_type", "objective", "equipment", "materials",

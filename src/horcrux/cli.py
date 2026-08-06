@@ -16,18 +16,14 @@ def run_init() -> None:
         raw = input(f"{label} [{cur_val or ''}]: ").strip()
         return raw or (str(cur_val) if cur_val else "")
 
-    token = ask("디스코드 봇 토큰", cur.discord_token)
     vault = ask("볼트 절대경로", cur.vault.as_posix())
     provider = ask("LLM provider (claude/gemini/codex)", cur.provider)
     model = ask("모델 (빈 값 = CLI 기본)", cur.model)
-    log_ch = ask("log 채널 이름", cur.log_channel)
-    ask_ch = ask("ask 채널 이름", cur.ask_channel)
     path = save_config({
-        "discord_token": token or None, "vault": vault, "provider": provider,
-        "model": model or None, "log_channel": log_ch, "ask_channel": ask_ch,
+        "vault": vault, "provider": provider, "model": model or None,
     })
     print(f"저장됨: {path}")
-    print("다음: 'horcrux bot' 실행 (LLM CLI 로그인·봇 서버 초대는 README 참조)")
+    print("다음: 'horcrux serve' 실행 (LLM CLI 로그인은 README 참조)")
 
 
 def _utf8_console():
@@ -53,7 +49,6 @@ def main(argv: list[str] | None = None) -> None:
     fb.add_argument("--note", default="")
     sd = sub.add_parser("seed", help="합성 데모 데이터 생성")
     sd.add_argument("-n", type=int, default=6)
-    sub.add_parser("bot", help="디스코드 봇 실행")
     sv = sub.add_parser("serve", help="웹 UI 서버 (LAB GENE)")
     sv.add_argument("--host", default="127.0.0.1")
     sv.add_argument("--port", type=int, default=8765)
@@ -87,9 +82,6 @@ def main(argv: list[str] | None = None) -> None:
         elif args.cmd == "seed":
             from .seed import run_seed
             run_seed(cfg, args.n)
-        elif args.cmd == "bot":
-            from . import bot
-            bot.run_bot(cfg)
         elif args.cmd == "serve":
             try:
                 from .server import run_serve

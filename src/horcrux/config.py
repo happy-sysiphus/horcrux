@@ -10,9 +10,6 @@ class Config:
     vault: Path
     provider: str = "claude"
     model: str | None = None  # None = 각 CLI의 기본 모델 사용
-    discord_token: str | None = None
-    log_channel: str = "실험로그"
-    ask_channel: str = "질문"
 
     def __post_init__(self):
         self.vault = Path(self.vault)
@@ -41,9 +38,6 @@ def load_config() -> Config:
         vault=Path(pick("HORCRUX_VAULT", "vault", "example-vault")),
         provider=pick("HORCRUX_PROVIDER", "provider", "claude"),
         model=pick("HORCRUX_MODEL", "model", None),
-        discord_token=pick("HORCRUX_DISCORD_TOKEN", "discord_token", None),
-        log_channel=pick("HORCRUX_LOG_CHANNEL", "log_channel", "실험로그"),
-        ask_channel=pick("HORCRUX_ASK_CHANNEL", "ask_channel", "질문"),
     )
 
 

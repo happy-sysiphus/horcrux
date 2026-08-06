@@ -15,9 +15,6 @@ def test_load_config_defaults(isolated_config):
     assert cfg.provider == "claude"
     assert cfg.model is None
     assert str(cfg.vault) == "example-vault"
-    assert cfg.discord_token is None
-    assert cfg.log_channel == "실험로그"
-    assert cfg.ask_channel == "질문"
 
 
 def test_load_config_env_override(isolated_config, monkeypatch):
@@ -32,15 +29,11 @@ def test_load_config_env_override(isolated_config, monkeypatch):
 
 def test_load_config_from_file(isolated_config):
     isolated_config.write_text(yaml.safe_dump({
-        "discord_token": "tok", "vault": "C:/lab/v", "provider": "codex",
-        "log_channel": "lab-log",
+        "vault": "C:/lab/v", "provider": "codex",
     }, allow_unicode=True), encoding="utf-8")
     cfg = load_config()
-    assert cfg.discord_token == "tok"
     assert cfg.vault == Path("C:/lab/v")
     assert cfg.provider == "codex"
-    assert cfg.log_channel == "lab-log"
-    assert cfg.ask_channel == "질문"  # 파일에 없는 키는 기본값
 
 
 def test_env_beats_file(isolated_config, monkeypatch):
@@ -51,11 +44,10 @@ def test_env_beats_file(isolated_config, monkeypatch):
 
 def test_save_config_roundtrip(isolated_config):
     from horcrux.config import save_config
-    path = save_config({"discord_token": "t", "vault": "C:/v", "provider": "claude",
-                        "model": None, "log_channel": "실험로그", "ask_channel": "질문"})
+    path = save_config({"vault": "C:/v", "provider": "claude", "model": None})
     assert path == isolated_config
     cfg = load_config()
-    assert cfg.discord_token == "t" and cfg.vault == Path("C:/v")
+    assert cfg.vault == Path("C:/v")
 
 
 def test_save_config_creates_parent_dir(monkeypatch, tmp_path):

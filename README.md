@@ -21,25 +21,16 @@ Windows Defender가 차단하면 [추가 정보 → 실행] 또는 [허용]으�
 
 1. **LLM CLI 설치·로그인** — 셋 중 하나: `claude`(Claude Code) / `gemini`(Gemini CLI) /
    `codex`(Codex CLI). Horcrux는 API 키 대신 로컬 CLI를 subprocess로 호출한다.
-2. **디스코드 봇 계정 생성·서버 초대** — 아래 "디스코드 봇 > 준비" 참조.
-3. **설정 마법사**:
+2. **설정 마법사**:
 
 ```
 horcrux init
 ```
 
-토큰·볼트 절대경로·provider·채널명을 물어 `~/.horcrux/config.yaml`에 저장한다.
-(환경변수 `HORCRUX_*`가 설정돼 있으면 그게 파일보다 우선. 토큰은 평문 저장 —
-유출 시 개발자 포털에서 Reset Token.)
+볼트 절대경로·provider·모델을 물어 `~/.horcrux/config.yaml`에 저장한다.
+(환경변수 `HORCRUX_*`가 설정돼 있으면 그게 파일보다 우선.)
 
-4. **실행**:
-
-```
-horcrux bot
-```
-
-봇은 이 프로세스가 켜져 있는 동안만 응답한다. 재부팅 후 자동 시작하려면:
-`horcrux bot` 한 줄짜리 `horcrux.bat`을 만들어 `Win+R` → `shell:startup` 폴더에 넣는다.
+3. **실행** — 아래 "웹 UI (LAB GENE)" 참조.
 
 ### 개발 설치
 
@@ -50,30 +41,6 @@ pip install -e .[dev]
 
 검색은 LLM-select: LLM이 레코드·위키 카탈로그를 읽고 유사 사례를 직접 고른다.
 임베딩·벡터 인덱스 없이 CLI 로그인만으로 동작한다.
-
-## 디스코드 봇
-
-봇 프로세스를 랩서버에 상주시키면 연구원은 디스코드 채널로 기록·질의한다.
-
-### 준비 (1회)
-
-1. [Discord 개발자 포털](https://discord.com/developers/applications) → New Application → Bot 추가
-2. **Privileged Gateway Intents에서 Message Content Intent 켜기** (필수)
-3. Bot 토큰 발급 → `horcrux init`에서 입력 (또는 환경변수 `HORCRUX_DISCORD_TOKEN`. 레포·코드에 넣지 말 것)
-4. OAuth2 → URL Generator에서 `bot` 스코프 + 권한(View Channels, Send Messages, Read Message History) 체크 → 생성된 URL로 서버에 초대
-5. 서버에 텍스트 채널 `실험로그`, `질문` 생성 (이름 변경 시 `HORCRUX_LOG_CHANNEL`/`HORCRUX_ASK_CHANNEL`)
-
-### 실행
-
-```bash
-horcrux bot
-```
-
-- `#실험로그`에 자연어 로그를 쓰면 구조화 저장 (부족 정보는 봇이 되물음 — 10분 무응답 시 그대로 저장)
-- 사진 등 첨부는 볼트 `raw/attachments/<레코드id>/`에 저장되고 기록 본문에 링크됨 (이미지 내용 분석은 안 함. 파싱 실패 needs_review 레코드는 폴더에만 저장되고 본문 링크 없음)
-- `#질문`에 문제를 쓰면 과거 사례·위키 기반 진단
-- `/feedback` `/absorb` `/seed` 슬래시 커맨드 지원
-- 랩서버에도 선택한 LLM CLI(claude 등)가 설치·로그인돼 있어야 한다
 
 ## 사용
 
@@ -93,7 +60,7 @@ horcrux serve         # 웹 UI (LAB GENE) — http://127.0.0.1:8765
     horcrux serve
 
 브라우저에서 http://127.0.0.1:8765 접속. 기록/질문/연구노트/실험 피드백/후속 실험을
-브라우저에서 수행한다 (CLI·디스코드 봇과 같은 볼트 공유).
+브라우저에서 수행한다 (CLI와 같은 볼트 공유).
 개발 모드: `horcrux serve` + `cd web && npm run dev` (vite가 /api 프록시).
 
 ## 연구실 설정 (§2a)
