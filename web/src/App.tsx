@@ -12,6 +12,7 @@ import Login from "./pages/Login";
 import Notes from "./pages/Notes";
 import Onboarding from "./pages/Onboarding";
 import Preview from "./pages/Preview";
+import Settings from "./pages/Settings";
 
 // 같은 route 안에서 :sid만 바뀌면 React가 컴포넌트를 remount하지 않아 훅 내부 세션 상태와
 // 자동 시작 가드가 이전 세션에 남는다. key로 세션마다 강제 remount.
@@ -49,6 +50,7 @@ export default function App() {
             <Route path="/notes" element={<Notes />} />
             <Route path="/notes/:id" element={<Notes />} />
             <Route path="/followup/:sid" element={<BySid><FollowUp /></BySid>} />
+            <Route path="/settings" element={<Settings />} />
           </Routes>
         </main>
       </div>

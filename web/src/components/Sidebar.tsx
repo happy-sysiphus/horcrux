@@ -1,4 +1,5 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useAuth } from "../auth";
 import { useNav } from "../nav";
 import { listSessions } from "../store";
 import type { Session } from "../types";
@@ -19,13 +20,18 @@ export default function Sidebar() {
   const nav = useNavigate();
   const loc = useLocation();
   const { open, setOpen } = useNav();
+  const { mode, me, signOut } = useAuth();
   const close = () => setOpen(false);
+  const links = me?.role === "admin"
+    ? [...LINKS, { to: "/settings", icon: "⚙", label: "연구실 설정",
+                   match: (p: string) => p.startsWith("/settings") }]
+    : LINKS;
   const sessions = listSessions();
   const today = new Date().toDateString();
   const isToday = (s: Session) => new Date(s.createdAt).toDateString() === today;
 
   const navLinks = (dark: boolean) =>
-    LINKS.map((l) => (
+    links.map((l) => (
       <Link key={l.to} to={l.to} onClick={close}
         className={`rounded px-3 py-2 text-sm ${dark
           ? (l.match(loc.pathname) ? "bg-slate-700" : "hover:bg-slate-800")
@@ -85,6 +91,17 @@ export default function Sidebar() {
           <div className="flex flex-col gap-1 border-t border-slate-200 p-3 md:hidden">
             {navLinks(false)}
           </div>
+          {mode === "deploy" && me?.lab && (
+            <div className="border-t border-slate-200 p-3">
+              <div className="truncate text-sm font-medium">{me.lab.name}</div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-slate-400">{me.role === "admin" ? "관리자" : "멤버"}</span>
+                <button onClick={() => void signOut()} className="text-xs text-slate-400 underline">
+                  로그아웃
+                </button>
+              </div>
+            </div>
+          )}
         </aside>
       </div>
     </>
