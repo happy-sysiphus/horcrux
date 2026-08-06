@@ -81,8 +81,9 @@ class JoinIn(BaseModel):
 
 
 class SettingsIn(BaseModel):
+    # daily_llm_limit은 일부러 없다 — 일일 상한은 서비스 운영자만 정한다(DB에서 직접).
+    # 연구실 관리자가 자기 상한을 올릴 수 있으면 중앙 API 키 비용을 통제할 수 없다.
     name: str | None = None
-    daily_llm_limit: int | None = None
     llm_mode: str | None = None          # 'central'로 되돌리기
     llm_provider: str | None = None      # own 등록: 'claude' | 'api'
     llm_credential: str | None = None    # own 등록: 평문 토큰/키 (서버가 암호화)
@@ -303,7 +304,6 @@ def create_app(cfg: Config, deploy: DeployCtx | None = None) -> FastAPI:
             deploy.db.set_credential(ctx.lab["id"], inp.llm_provider, inp.llm_credential)
         fields = {}
         if inp.name: fields["name"] = inp.name
-        if inp.daily_llm_limit: fields["daily_llm_limit"] = inp.daily_llm_limit
         if inp.llm_mode: fields["llm_mode"] = inp.llm_mode
         if inp.rotate_invite:
             from .labs import new_invite_code

@@ -7,7 +7,6 @@ export default function Settings() {
   const { me, refreshLab } = useAuth();
   const lab = me?.lab;
   const [name, setName] = useState(lab?.name ?? "");
-  const [limit, setLimit] = useState(lab?.daily_llm_limit ?? 200);
   const [mode, setMode] = useState<"central" | "own">(lab?.llm_mode ?? "central");
   const [provider, setProvider] = useState(lab?.llm_provider ?? "claude");
   const [credential, setCredential] = useState("");
@@ -27,11 +26,12 @@ export default function Settings() {
   // own으로 처음 전환할 땐 크레덴셜이 없으면 서버가 502를 내므로 저장을 막는다
   const modeChangedToOwn = mode === "own" && lab.llm_mode !== "own";
   const canSave = !busy && !(modeChangedToOwn && !credential.trim());
+  const used = me.usage_today;
+  const pct = Math.min(100, Math.round((used / Math.max(1, lab.daily_llm_limit)) * 100));
 
   function save() {
     const patch: Parameters<typeof api.labSettings>[0] = {};
     if (name.trim() && name.trim() !== lab!.name) patch.name = name.trim();
-    if (limit !== lab!.daily_llm_limit) patch.daily_llm_limit = limit;
     if (mode !== lab!.llm_mode) patch.llm_mode = mode;
     if (mode === "own" && credential.trim()) {
       patch.llm_provider = provider;
@@ -50,12 +50,20 @@ export default function Settings() {
           <div className="text-xs text-slate-400">연구실 이름</div>
           <input value={name} onChange={(e) => setName(e.target.value)}
             className="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm" />
-          <div className="mt-4 text-xs text-slate-400">일일 LLM 사용 상한</div>
-          <input type="number" value={limit} onChange={(e) => setLimit(Number(e.target.value))}
-            className="mt-1 w-40 rounded border border-slate-300 px-3 py-2 text-sm" />
-          <div className="mt-2 text-sm text-slate-500">
-            오늘 사용량 {me.usage_today} / {lab.daily_llm_limit}
+        </div>
+
+        <div className="rounded-xl border border-slate-200 bg-white p-5">
+          <div className="flex items-baseline justify-between">
+            <div className="font-semibold">오늘 사용량</div>
+            <div className="text-sm text-slate-500">{used} / {lab.daily_llm_limit}</div>
           </div>
+          <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-slate-100">
+            <div className={`h-full ${pct >= 90 ? "bg-red-500" : "bg-blue-600"}`}
+              style={{ width: `${pct}%` }} />
+          </div>
+          <p className="mt-2 text-xs text-slate-400">
+            일일 상한은 서비스 운영자가 연구실별로 정합니다. 조정이 필요하면 운영자에게 요청하세요.
+          </p>
         </div>
 
         <div className="rounded-xl border border-slate-200 bg-white p-5">

@@ -18,7 +18,12 @@ describe("Settings", () => {
   it("초대 코드·사용량·멤버를 렌더한다", () => {
     render(<Settings />);
     expect(screen.getByText("abcd1234")).toBeTruthy();
-    expect(screen.getByText(/오늘 사용량 3/)).toBeTruthy();
+    expect(screen.getByText("3 / 200")).toBeTruthy();
     expect(screen.getByText("a@b.c")).toBeTruthy();
+  });
+
+  it("일일 상한은 편집할 수 없다 — 운영자 전용", () => {
+    const { container } = render(<Settings />);
+    expect(container.querySelector('input[type="number"]')).toBeNull();
   });
 });

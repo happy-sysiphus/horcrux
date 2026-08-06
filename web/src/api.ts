@@ -49,8 +49,9 @@ export const api = {
   labCreate: (name: string) => http<{ lab: Lab; role: string }>("POST", "/api/labs", { name }),
   labJoin: (invite_code: string) =>
     http<{ lab: Lab; role: string }>("POST", "/api/labs/join", { invite_code }),
+  // daily_llm_limit은 일부러 빠져 있다 — 일일 상한은 운영자만 DB에서 정한다
   labSettings: (patch: Partial<{
-    name: string; daily_llm_limit: number; llm_mode: string;
+    name: string; llm_mode: string;
     llm_provider: string; llm_credential: string; rotate_invite: boolean;
   }>) => http<{ ok: boolean }>("PUT", "/api/labs/settings", patch),
 };

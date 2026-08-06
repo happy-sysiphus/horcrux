@@ -21,6 +21,7 @@ class FakeDB:
     def __init__(self):
         self.labs, self.members, self.usage_ok = {}, {}, True
         self.credentials = {}
+        self.last_limit = None      # bump_usage에 실제로 넘어간 상한 — 천장 적용 확인용
 
     def create_lab(self, user_id, name):
         lab = {"id": f"lab-{len(self.labs)+1}", "name": name, "invite_code": "abcd1234",
@@ -54,6 +55,7 @@ class FakeDB:
         self.labs[lab_id].update({"llm_mode": "own", "llm_provider": provider})
 
     def bump_usage(self, lab_id, limit):
+        self.last_limit = limit
         return self.usage_ok
 
     def get_usage(self, lab_id):
@@ -177,6 +179,28 @@ def test_lab_me_usage_and_members(deploy_client):
     assert admin["usage_today"] == 3
     assert {m["role"] for m in admin["members"]} == {"admin", "member"}
     assert "members" not in client.get("/api/labs/me", headers=auth(tok("u2"))).json()
+
+
+def test_lab_admin_cannot_change_daily_limit(deploy_client):
+    # 일일 상한은 운영자 전용 — 연구실 관리자가 보내도 반영되지 않는다
+    client, db = deploy_client
+    client.post("/api/labs", json={"name": "랩"}, headers=auth(tok("u1")))
+    r = client.put("/api/labs/settings",
+                   json={"name": "새이름", "daily_llm_limit": 5000}, headers=auth(tok("u1")))
+    assert r.status_code == 200
+    assert db.labs["lab-1"]["daily_llm_limit"] == 200     # 무시됨
+    assert db.labs["lab-1"]["name"] == "새이름"           # 같은 요청의 나머지는 반영
+
+
+def test_usage_uses_operator_set_limit(deploy_client, monkeypatch):
+    # 운영자가 DB에서 상한을 바꾸면 다음 호출부터 그 값으로 센다
+    client, db = deploy_client
+    client.post("/api/labs", json={"name": "랩"}, headers=auth(tok("u1")))
+    db.labs["lab-1"]["daily_llm_limit"] = 50             # Supabase 대시보드에서 고친 상황
+    monkeypatch.setattr(server, "diagnose_data", lambda cfg, t: {
+        "answer": "a", "evidence": "none", "records": [], "wiki": []})
+    assert client.post("/api/ask", json={"text": "q"}, headers=auth(tok("u1"))).status_code == 200
+    assert db.last_limit == 50
 
 
 def test_settings_admin_only(deploy_client):
