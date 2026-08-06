@@ -67,6 +67,11 @@ export function buildGraph(records: RecordMeta[]): { nodes: GraphNode[]; links: 
       const t = entity("cause", r.resolution.actual_cause, r.id);
       if (t) addLink(r.id, t);
     }
+    // 참고문헌의 내부 레코드 참조 — 대상 존재·자기참조 제외, addLink가 dedup
+    for (const ref of r.references ?? []) {
+      if (ref.type === "record" && ref.record_id && ref.record_id !== r.id && expIds.has(ref.record_id))
+        addLink(r.id, ref.record_id);
+    }
     if (r.followup_of && expIds.has(r.followup_of)) addLink(r.followup_of, r.id);
   }
   return { nodes: [...nodes.values()], links };

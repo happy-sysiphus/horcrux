@@ -29,10 +29,18 @@ export interface ParsedLog {
   unrecorded_required_parameters: string[];
 }
 
+export interface Reference {
+  type: "paper" | "link" | "record" | "pdf";  // pdf는 파일 첨부 스펙에서 사용 예정
+  title: string;
+  url: string;
+  record_id: string;
+}
+
 export interface RecordMeta {
   id: string; date: string; experiment_type: string; objective: string;
   equipment: string[]; materials: string[]; symptom: Symptom;
   resolution: Resolution; needs_review: boolean; followup_of: string | null;
+  references?: Reference[];   // 백엔드 병합 전 응답엔 없다 — 읽는 쪽에서 ?? []
 }
 export interface RecordDetail {
   record: RecordMeta & {

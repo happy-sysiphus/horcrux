@@ -59,6 +59,20 @@ describe("buildGraph", () => {
     expect(links).toEqual([{ source: "base", target: "next" }]);
   });
 
+  it("record 참조 엣지는 대상이 있을 때만, paper·자기참조·부재 대상은 무시", () => {
+    const { links, nodes } = buildGraph([
+      mk({ id: "a" }),
+      mk({ id: "b", references: [
+        { type: "record", record_id: "a", title: "", url: "" },
+        { type: "record", record_id: "b", title: "", url: "" },
+        { type: "record", record_id: "없는것", title: "", url: "" },
+        { type: "paper", record_id: "", title: "논문", url: "https://doi.org/10.1/x" },
+      ] }),
+    ]);
+    expect(links).toEqual([{ source: "b", target: "a" }]);
+    expect(nodes.filter((n) => n.kind !== "exp")).toHaveLength(0); // paper는 노드 아님
+  });
+
   it("빈 문자열 엔티티와 중복 엣지는 버린다", () => {
     const { nodes, links } = buildGraph([
       mk({ id: "a", equipment: ["", "  ", "RIE-01", "RIE-01"] }),

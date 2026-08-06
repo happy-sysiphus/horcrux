@@ -1,4 +1,4 @@
-import type { AppConfig, AskResult, ParsedLog, RecordDetail, RecordMeta } from "./types";
+import type { AppConfig, AskResult, ParsedLog, RecordDetail, RecordMeta, Reference } from "./types";
 
 async function http<T>(method: string, url: string, body?: unknown): Promise<T> {
   const res = await fetch(url, {
@@ -27,5 +27,7 @@ export const api = {
   feedback: (recordId: string, resolved: boolean, cause?: string, note?: string) =>
     http<{ message: string }>("POST", "/api/feedback",
       { record_id: recordId, resolved, cause: cause ?? null, note: note ?? "" }),
+  putReferences: (recordId: string, references: Reference[]) =>
+    http<{ record: RecordMeta }>("PUT", `/api/records/${recordId}/references`, { references }),
   config: () => http<AppConfig>("GET", "/api/config"),
 };
