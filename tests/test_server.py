@@ -4,7 +4,7 @@ from fastapi.testclient import TestClient
 from horcrux import server
 from horcrux.config import Config
 from horcrux.ingest import ParsedLog
-from horcrux.records import ExperimentRecord, record_path, save_record
+from horcrux.records import ExperimentRecord, record_path, save_record, write_md
 
 
 @pytest.fixture
@@ -68,6 +68,32 @@ def test_feedback_updates_resolution(client):
     detail = c.get("/api/records/2026-08-01_b-001").json()
     assert detail["record"]["resolution"]["resolved"] is True
     assert detail["record"]["resolution"]["actual_cause"] == "타겟 산화"
+
+
+def test_references_roundtrip(client):
+    c, vault = client
+    save_record(vault, ExperimentRecord(id="2026-08-01_c-001", date="2026-08-01"), "원문", "s")
+    refs = [{"type": "paper", "title": "ALD 논문", "url": "https://doi.org/10.1/x", "record_id": ""},
+            {"type": "record", "title": "", "url": "", "record_id": "2026-08-01_c-001"}]
+    r = c.put("/api/records/2026-08-01_c-001/references", json={"references": refs})
+    assert r.status_code == 200
+    assert r.json()["record"]["references"] == refs
+    detail = c.get("/api/records/2026-08-01_c-001").json()
+    assert detail["record"]["references"] == refs
+    assert "원문 로그" in detail["body"]  # 본문 보존
+
+
+def test_references_missing_record(client):
+    c, _ = client
+    assert c.put("/api/records/없는것/references", json={"references": []}).status_code == 404
+
+
+def test_legacy_record_without_references_key(client):
+    c, vault = client
+    # references 키가 없는 구버전 md도 읽혀야 한다
+    write_md(record_path(vault, "2026-08-01_d-001"),
+             {"id": "2026-08-01_d-001", "date": "2026-08-01"}, "본문")
+    assert c.get("/api/records").json()["records"][0]["references"] == []
 
 
 def test_config_endpoint(client):

@@ -24,6 +24,15 @@ class SuspectedCause(BaseModel):
     status: Literal["unconfirmed", "confirmed", "rejected"] = "unconfirmed"
 
 
+class Reference(BaseModel):
+    # 타입을 Literal이 아니라 str로 둔다 — 나중에 "pdf" 같은 타입이 늘어도
+    # 구버전이 신버전 md를 읽다 검증 실패하지 않게. UI는 3종만 만든다.
+    type: str = "link"  # paper | link | record
+    title: str = ""
+    url: str = ""  # DOI는 프론트가 https://doi.org/... 로 정규화해서 보낸다
+    record_id: str = ""  # record 타입만 사용
+
+
 class Resolution(BaseModel):
     resolved: bool = False
     actual_cause: str | None = None
@@ -43,6 +52,7 @@ class ExperimentRecord(BaseModel):
     suspected_causes: list[SuspectedCause] = Field(default_factory=list)
     actions_taken: list[str] = Field(default_factory=list)
     notes: str = ""  # 특이사항 — 문제로 단정되지 않은 과정 관찰·절차 일탈·환경 특이점
+    references: list[Reference] = Field(default_factory=list)
     resolution: Resolution = Field(default_factory=Resolution)
     followup_of: str | None = None  # 후속 실험이면 기준 레코드 id
     needs_review: bool = False

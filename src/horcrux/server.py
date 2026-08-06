@@ -18,10 +18,10 @@ from .diagnose import diagnose_data
 from .feedback import run_feedback
 from .ingest import ParsedLog, missing_required, parse_log, save_unparsed, to_record
 from .labs import LabsDB
-from .records import list_records, load_record, record_path, save_record
+from .records import Reference, list_records, load_record, record_path, save_record, write_md
 
 _META_KEYS = ("id", "date", "experiment_type", "objective", "equipment", "materials",
-              "symptom", "resolution", "needs_review", "followup_of")
+              "symptom", "resolution", "needs_review", "followup_of", "references")
 
 
 @dataclass
@@ -66,6 +66,10 @@ class FeedbackIn(BaseModel):
     resolved: bool
     cause: str | None = None
     note: str = ""
+
+
+class ReferencesIn(BaseModel):
+    references: list[Reference]
 
 
 class LabIn(BaseModel):
@@ -228,6 +232,16 @@ def create_app(cfg: Config, deploy: DeployCtx | None = None) -> FastAPI:
         with lab_lock(ctx):
             msg = run_feedback(c, inp.record_id, inp.resolved, inp.cause, inp.note)
         return {"message": msg}
+
+    @app.put("/api/records/{record_id}/references")
+    def api_put_references(record_id: str, inp: ReferencesIn, ctx=Depends(require_lab)):
+        c = lab_cfg(ctx)
+        p = _existing_record(c.vault, record_id)
+        with lab_lock(ctx):
+            rec, body = load_record(p)
+            rec.references = inp.references
+            write_md(p, rec.model_dump(), body)  # body 보존 — update_resolution과 동일
+        return {"record": _meta(rec)}
 
     @app.get("/api/config")
     def api_config(ctx=Depends(require_lab)):
