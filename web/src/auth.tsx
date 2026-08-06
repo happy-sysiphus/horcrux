@@ -52,17 +52,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setMode("local");
           return;
         }
-        const client = createClient(cfg.supabase_url, cfg.supabase_anon_key);
+        // 기본 implicit 흐름은 토큰을 URL 해시로 돌려보내는데 HashRouter가 부팅하며
+        // 해시를 #/로 덮어써 토큰이 유실된다(로그인 루프). PKCE는 ?code= 쿼리라 무사하다.
+        const client = createClient(cfg.supabase_url, cfg.supabase_anon_key,
+          { auth: { flowType: "pkce" } });
         sb.current = client;
         registerAuth(
           async () => (await client.auth.getSession()).data.session?.access_token ?? null,
           (status) => { if (status === 401) void client.auth.signOut(); },
         );
+        // 구독을 getSession보다 먼저 — OAuth 복귀 직후 code 교환이 비동기로 끝나며
+        // 쏘는 SIGNED_IN을 놓치면 로그인 후에도 화면이 안 넘어간다
+        const sub = client.auth.onAuthStateChange((_e, s) => setSession(s));
+        unsub = () => sub.data.subscription.unsubscribe();
         const { data } = await client.auth.getSession();
         setSession(data.session);
         setMode("deploy");
-        const sub = client.auth.onAuthStateChange((_e, s) => setSession(s));
-        unsub = () => sub.data.subscription.unsubscribe();
       } catch {
         setMode("local");   // auth-config가 없는 구버전 서버 — 기존 동작 유지
       }
