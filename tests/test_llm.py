@@ -237,3 +237,36 @@ def test_generate_parsed_bad_json_raises_after_retry(fake_run):
 ])
 def test_extract_json(raw, expect):
     assert _extract_json(raw) == expect
+
+
+# --- api provider: anthropic SDK (중앙 모드, _anthropic_client 모킹) ---
+
+
+def test_generate_api_provider(monkeypatch):
+    calls = {}
+
+    class FakeMsg:
+        content = [type("B", (), {"type": "text", "text": "응답"})()]
+
+    class FakeClient:
+        def __init__(self, api_key):
+            calls["key"] = api_key
+            self.messages = type("M", (), {"create": self._create})()
+
+        def _create(self, **kw):
+            calls["kw"] = kw
+            return FakeMsg()
+
+    import horcrux.llm as llm_mod
+    monkeypatch.setattr(llm_mod, "_anthropic_client", lambda key: FakeClient(key))
+    out = generate(Config(vault="v", provider="api", model="claude-sonnet-4-5",
+                          api_key="sk-test"), "시스템", "유저")
+    assert out == "응답"
+    assert calls["key"] == "sk-test"
+    assert calls["kw"]["system"] == "시스템"
+
+
+def test_generate_api_without_key_raises(monkeypatch):
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    with pytest.raises(RuntimeError, match="ANTHROPIC_API_KEY"):
+        generate(Config(vault="v", provider="api"), "s", "u")

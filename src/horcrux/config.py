@@ -10,6 +10,7 @@ class Config:
     vault: Path
     provider: str = "claude"
     model: str | None = None  # None = 각 CLI의 기본 모델 사용
+    api_key: str | None = None  # provider == "api"일 때 사용 (없으면 env ANTHROPIC_API_KEY)
 
     def __post_init__(self):
         self.vault = Path(self.vault)

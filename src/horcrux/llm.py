@@ -12,8 +12,9 @@ from pydantic import BaseModel
 
 from .config import Config
 
-PROVIDERS = ("claude", "gemini", "codex")
+PROVIDERS = ("claude", "gemini", "codex", "api")
 _TIMEOUT = 300  # 초 — CLI 무응답 행 방지
+_API_DEFAULT_MODEL = "claude-sonnet-4-5"
 
 
 def _exe(name: str) -> str:
@@ -46,7 +47,25 @@ def _run(cmd: list[str], prompt: str) -> str:
     return out.strip()
 
 
+def _anthropic_client(api_key: str):
+    import anthropic
+    return anthropic.Anthropic(api_key=api_key)
+
+
+def _generate_api(cfg: Config, system: str, user: str) -> str:
+    key = cfg.api_key or os.environ.get("ANTHROPIC_API_KEY")
+    if not key:
+        raise RuntimeError("api provider에는 ANTHROPIC_API_KEY(또는 연구실 키)가 필요합니다")
+    resp = _anthropic_client(key).messages.create(
+        model=cfg.model or _API_DEFAULT_MODEL, max_tokens=16000,
+        system=system, messages=[{"role": "user", "content": user}],
+    )
+    return next(b.text for b in resp.content if b.type == "text").strip()
+
+
 def generate(cfg: Config, system: str, user: str) -> str:
+    if cfg.provider == "api":
+        return _generate_api(cfg, system, user)
     # 프롬프트는 stdin으로 전달 — Windows 커맨드라인 길이 제한 회피
     prompt = f"{system}\n\n{user}"
     model = ["--model", cfg.model] if cfg.model else []
