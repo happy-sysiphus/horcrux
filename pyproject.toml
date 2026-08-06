@@ -9,7 +9,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest", "fastapi", "httpx"]  # tests/test_server.py가 fastapi.testclient(→httpx)를 import
+dev = ["pytest", "fastapi", "httpx", "cryptography"]  # tests/test_server.py가 fastapi.testclient(→httpx)를 import, tests/test_labs.py가 cryptography를 import
 release = ["build", "pyinstaller"]
 web = ["fastapi", "uvicorn"]
 deploy = ["anthropic", "supabase", "PyJWT", "cryptography"]
