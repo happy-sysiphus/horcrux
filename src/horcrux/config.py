@@ -10,9 +10,8 @@ class Config:
     vault: Path
     provider: str = "claude"
     model: str | None = None  # None = 각 CLI의 기본 모델 사용
-    discord_token: str | None = None
-    log_channel: str = "실험로그"
-    ask_channel: str = "질문"
+    api_key: str | None = None  # provider == "api"일 때 사용 (없으면 env ANTHROPIC_API_KEY)
+    extra_env: dict[str, str] | None = None  # CLI 서브프로세스에 병합할 연구실별 크레덴셜
 
     def __post_init__(self):
         self.vault = Path(self.vault)
@@ -41,9 +40,6 @@ def load_config() -> Config:
         vault=Path(pick("HORCRUX_VAULT", "vault", "example-vault")),
         provider=pick("HORCRUX_PROVIDER", "provider", "claude"),
         model=pick("HORCRUX_MODEL", "model", None),
-        discord_token=pick("HORCRUX_DISCORD_TOKEN", "discord_token", None),
-        log_channel=pick("HORCRUX_LOG_CHANNEL", "log_channel", "실험로그"),
-        ask_channel=pick("HORCRUX_ASK_CHANNEL", "ask_channel", "질문"),
     )
 
 
@@ -56,7 +52,7 @@ def save_config(values: dict) -> Path:
 
 
 # §2a — 구조 카테고리 하드 게이트 후보 (볼트 config.yaml의 required_fields가 이 중에서 선택)
-GATEABLE_FIELDS = ["objective", "parameters", "results", "symptom", "actions_taken"]
+GATEABLE_FIELDS = ["objective", "parameters", "results", "symptom", "actions_taken", "notes"]
 
 
 @dataclass

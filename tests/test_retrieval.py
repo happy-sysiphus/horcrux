@@ -92,3 +92,19 @@ def test_hallucinations_do_not_consume_top_k(tmp_path, monkeypatch):
         record_ids=["없는-1", "없는-2", "2026-07-19_exp-000", "2026-07-19_exp-001"]))
     res = rt.retrieve(Config(vault=tmp_path), "질의", top_k=2)
     assert [r["id"] for r in res["records"]] == ["2026-07-19_exp-000", "2026-07-19_exp-001"]
+
+
+def test_catalog_includes_notes(tmp_path, monkeypatch):
+    rec = ExperimentRecord(
+        id="2026-08-05_exp-001", date="2026-08-05", experiment_type="증착",
+        notes="증착 중 정전 발생")
+    save_record(tmp_path, rec, "원문", "정리")
+    captured = {}
+
+    def fake_parsed(cfg, system, user, schema):
+        captured["user"] = user
+        return rt.Selected()
+
+    monkeypatch.setattr(rt, "generate_parsed", fake_parsed)
+    rt.retrieve(Config(vault=tmp_path), "질의")
+    assert "특이사항: 증착 중 정전 발생" in captured["user"]

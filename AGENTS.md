@@ -46,6 +46,10 @@
 - **ask는 단일 흐름**: 질문 1회 → 검색 → 응답. 재질문·질의 구조화·증상 분기 없음.
   근거 3단 라벨(레코드 있음 / 위키만 / 둘 다 없음)로 답변 출처를 정직하게 표시.
 - 환경변수는 3개뿐: `HORCRUX_VAULT`(기본 `example-vault`), `HORCRUX_PROVIDER`, `HORCRUX_MODEL`.
+- **서버 배포 모드(옵트인)**: `SUPABASE_URL` 설정 시 `create_app(cfg, deploy=...)`가 Supabase
+  JWT 인증을 요구하고 연구실별로 `DATA_DIR/vaults/<lab_id>`에 볼트를 격리한다. 미설정
+  (`deploy=None`)이면 기존 로컬 동작과 동일. 상세는
+  `docs/superpowers/specs/2026-08-06-deployment-auth-design.md`.
 
 ## 테스트 규칙
 
@@ -69,7 +73,6 @@
 
 | 영역 | 소유 파일 |
 |---|---|
-| 프론트 (디스코드 봇) | `src/horcrux/bot.py`, `tests/test_bot.py` |
 | 백엔드 (코어) | `src/horcrux/{ingest,diagnose,retrieval,absorb,feedback,records,llm,config,seed}.py` + 기존 테스트 |
 | 공용 접점 | `cli.py`, `pyproject.toml`, `README.md`, `docs/**` |
 

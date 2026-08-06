@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 from .config import Config
@@ -13,7 +14,14 @@ ANSWER_SYSTEM = """당신은 연구실의 과거 실험 기록을 근거로 문�
 1) 유사 사례 요약 (반드시 레코드 id 인용)
 2) 원인 후보 (과거에 확인된(confirmed) 원인 우선, 미확정(unconfirmed) 추측은 그렇다고 명시)
 3) 확인 방법 (무엇을 먼저 확인할지 순서대로)
-컨텍스트에 없는 사례를 지어내지 마라. 사례가 없다고 표시된 경우, 일반 지식 기반 조언임을 명확히 밝혀라."""
+컨텍스트에 없는 사례를 지어내지 마라. 사례가 없다고 표시된 경우, 일반 지식 기반 조언임을 명확히 밝혀라.
+마크다운 서식(**강조**, # 헤더 등) 없이 평문으로 써라. 번호·하이픈 목록만 허용."""
+
+
+def _strip_md(text: str) -> str:
+    # LLM이 지시를 어기고 넣은 볼드·헤더 마커 제거 — 채팅 UI에 평문으로 나가야 함
+    text = re.sub(r"\*\*(.+?)\*\*", r"\1", text)
+    return re.sub(r"(?m)^#{1,6}\s+", "", text)
 
 
 def diagnose_data(cfg: Config, text: str) -> dict:
@@ -27,7 +35,7 @@ def diagnose_data(cfg: Config, text: str) -> dict:
         for w in res["wiki"]
     ) or "(없음)"
     user = f"## 질의\n{text}\n\n## 유사 사례\n{cases}\n\n## 위키 아티클\n{wiki}"
-    answer = generate(cfg, ANSWER_SYSTEM, user)
+    answer = _strip_md(generate(cfg, ANSWER_SYSTEM, user))
     if not res["records"] and not res["wiki"]:
         evidence = "none"
     elif not res["records"]:

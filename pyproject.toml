@@ -6,13 +6,13 @@ requires-python = ">=3.10"
 dependencies = [
     "pydantic>=2",
     "pyyaml",
-    "discord.py>=2.6",
 ]
 
 [project.optional-dependencies]
-dev = ["pytest", "fastapi", "httpx"]  # tests/test_server.py가 fastapi.testclient(→httpx)를 import
+dev = ["pytest", "fastapi", "httpx", "cryptography", "PyJWT"]  # tests/test_server.py가 fastapi.testclient(→httpx)를 import, tests/test_labs.py가 cryptography를 import, tests/test_auth.py가 PyJWT를 import
 release = ["build", "pyinstaller"]
 web = ["fastapi", "uvicorn"]
+deploy = ["anthropic", "supabase", "PyJWT", "cryptography"]
 
 [project.scripts]
 horcrux = "horcrux.cli:main"

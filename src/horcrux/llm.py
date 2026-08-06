@@ -12,8 +12,9 @@ from pydantic import BaseModel
 
 from .config import Config
 
-PROVIDERS = ("claude", "gemini", "codex")
+PROVIDERS = ("claude", "gemini", "codex", "api")
 _TIMEOUT = 300  # 초 — CLI 무응답 행 방지
+_API_DEFAULT_MODEL = "claude-sonnet-4-5"
 
 
 def _exe(name: str) -> str:
@@ -25,10 +26,14 @@ def _exe(name: str) -> str:
     return path
 
 
-def _run(cmd: list[str], prompt: str) -> str:
+def _run(cmd: list[str], prompt: str, env: dict[str, str] | None = None) -> str:
+    if env:
+        # 연구실 자체 크레덴셜 사용 — 중앙 ANTHROPIC_API_KEY가 상속되면 claude CLI가
+        # 그쪽을 우선해 중앙 키로 과금된다. 상속 목록에서 제거 후 연구실 값 주입.
+        env = {k: v for k, v in os.environ.items() if k != "ANTHROPIC_API_KEY"} | env
     p = subprocess.Popen(
         cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-        text=True, encoding="utf-8",
+        text=True, encoding="utf-8", env=env,
     )
     try:
         out, err = p.communicate(prompt, timeout=_TIMEOUT)
@@ -46,14 +51,32 @@ def _run(cmd: list[str], prompt: str) -> str:
     return out.strip()
 
 
+def _anthropic_client(api_key: str):
+    import anthropic
+    return anthropic.Anthropic(api_key=api_key)
+
+
+def _generate_api(cfg: Config, system: str, user: str) -> str:
+    key = cfg.api_key or os.environ.get("ANTHROPIC_API_KEY")
+    if not key:
+        raise RuntimeError("api provider에는 ANTHROPIC_API_KEY(또는 연구실 키)가 필요합니다")
+    resp = _anthropic_client(key).messages.create(
+        model=cfg.model or _API_DEFAULT_MODEL, max_tokens=16000,
+        system=system, messages=[{"role": "user", "content": user}],
+    )
+    return next(b.text for b in resp.content if b.type == "text").strip()
+
+
 def generate(cfg: Config, system: str, user: str) -> str:
+    if cfg.provider == "api":
+        return _generate_api(cfg, system, user)
     # 프롬프트는 stdin으로 전달 — Windows 커맨드라인 길이 제한 회피
     prompt = f"{system}\n\n{user}"
     model = ["--model", cfg.model] if cfg.model else []
     if cfg.provider == "claude":
-        return _run([_exe("claude"), "-p", *model], prompt)
+        return _run([_exe("claude"), "-p", *model], prompt, env=cfg.extra_env)
     if cfg.provider == "gemini":
-        return _run([_exe("gemini"), *model], prompt)  # stdin 파이프 = headless
+        return _run([_exe("gemini"), *model], prompt, env=cfg.extra_env)  # stdin 파이프 = headless
     if cfg.provider == "codex":
         with tempfile.TemporaryDirectory() as td:
             out = Path(td) / "last.txt"
@@ -61,6 +84,7 @@ def generate(cfg: Config, system: str, user: str) -> str:
                 [_exe("codex"), "exec", "-", "--skip-git-repo-check", "--ephemeral",
                  "--sandbox", "read-only", "-o", str(out), *model],
                 prompt,
+                env=cfg.extra_env,
             )
             # codex stdout은 진행 로그 포함 — 최종 메시지는 -o 파일이 정본
             return out.read_text(encoding="utf-8").strip()

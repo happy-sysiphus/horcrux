@@ -17,12 +17,18 @@ PARSE_SYSTEM = """당신은 wet lab 실험 로그를 구조화하는 조수다.
 - experiment_type: 실험 유형 (자유 텍스트, 짧게. 예: 박막 증착, 졸겔 합성)
 - objective: 실험 목적
 - equipment / materials: 사용한 장비·재료 이름 목록
-- parameters: 공정변수. 연구원이 통제 가능한 변수는 controllable=true, 통제 불가(습도 등 환경)는 false
+- parameters: 공정변수. 연구원이 통제 가능한 변수는 controllable=true, 통제 불가(습도 등 환경)는 false.
+  value에는 반드시 단위를 포함하고 표준 기호로 통일하라(°C, nm, sccm, mTorr, W, min 등.
+  예: "250도" → "250 °C"). 횟수·비율·on/off 같은 무차원 값은 단위 없이 그대로.
+- parameters_missing_unit: 로그에 값은 있는데 단위를 알 수 없고 무차원도 아닌 파라미터 이름 목록
+  (parameters에 적은 name 그대로). 전부 단위가 있으면 빈 목록.
 - results: 결과 요약 (수치 포함)
 - symptom: 문제 증상 분류 — low_value(값이 낮음), unstable(불안정/재현성 문제), abnormal(비정상 개형/거동), none(문제 없음)
 - suspected_causes: 로그에 언급된 추측 원인 (전부 status=unconfirmed)
 - actions_taken: 취한 조치
-- summary: 로그를 2~4문장으로 정리한 서술
+- notes: 특이사항 — 문제로 단정되지 않은 과정 관찰·절차 일탈·환경 특이점(소음, 색 변화, 정전 등).
+  사용자가 특이사항이 없다고 명시하면 "특이사항 없음"으로 기록하고, 언급 자체가 없으면 비워 두라.
+- summary: 로그를 2~4문장으로 정리한 서술 (마크다운 서식 없이 평문)
 - unrecorded_required_parameters: 사용자 메시지에 [연구실 필수 파라미터 목록]이 있으면, 각 항목이
   로그에 기재됐는지 판단해 미기재 항목명만 목록의 표기 그대로 나열하라. 표현이 달라도 의미가 같으면
   기재된 것으로 본다 (예: 목록의 "챔버 습도" ↔ 로그의 "습도 40%"). 목록이 없으면 빈 목록.
@@ -40,8 +46,10 @@ class ParsedLog(BaseModel):
     symptom: Symptom = Field(default_factory=Symptom)
     suspected_causes: list[SuspectedCause] = Field(default_factory=list)
     actions_taken: list[str] = Field(default_factory=list)
+    notes: str = ""
     summary: str = ""
     unrecorded_required_parameters: list[str] = Field(default_factory=list)
+    parameters_missing_unit: list[str] = Field(default_factory=list)
 
 
 def parse_log(cfg: Config, text: str, vcfg: VaultConfig | None = None) -> ParsedLog:
@@ -58,6 +66,8 @@ def parse_log(cfg: Config, text: str, vcfg: VaultConfig | None = None) -> Parsed
     p.unrecorded_required_parameters = [
         n for n in p.unrecorded_required_parameters if n in vcfg.required_parameters
     ]
+    param_names = {pr.name for pr in p.parameters}
+    p.parameters_missing_unit = [n for n in p.parameters_missing_unit if n in param_names]
     return p
 
 
@@ -67,6 +77,7 @@ FIELD_QUESTIONS = {
     "results": "실험 결과는 어땠나요?",
     "symptom": "문제나 이상 증상이 있었나요? 없었다면 '문제 없음'이라고 알려주세요.",
     "actions_taken": "문제에 대해 어떤 조치를 취했나요?",
+    "notes": "실험 중 특이사항이 있었나요? 없었다면 '특이사항 없음'이라고 알려주세요.",
 }
 
 
@@ -77,9 +88,11 @@ def missing_required(p: ParsedLog, vcfg: VaultConfig) -> list[str]:
         "results": bool(p.results.strip()),
         "symptom": p.symptom.category != "none" or bool(p.symptom.description.strip()),
         "actions_taken": bool(p.actions_taken) or p.symptom.category == "none",
+        "notes": bool(p.notes.strip()),
     }
     gaps = [FIELD_QUESTIONS[f] for f in vcfg.required_fields if f in filled and not filled[f]]
     gaps += [f"연구실 필수 항목 '{n}' 값을 알려주세요." for n in p.unrecorded_required_parameters]
+    gaps += [f"공정변수 '{n}'의 단위를 알려주세요." for n in p.parameters_missing_unit]
     return gaps
 
 
@@ -87,7 +100,8 @@ def to_record(vault: Path, p: ParsedLog, date: str) -> ExperimentRecord:
     rid = make_record_id(vault, date, p.experiment_type or "exp")
     return ExperimentRecord(
         id=rid, date=date,
-        **p.model_dump(exclude={"summary", "unrecorded_required_parameters"}),
+        **p.model_dump(exclude={"summary", "unrecorded_required_parameters",
+                                "parameters_missing_unit"}),
     )
 
 
