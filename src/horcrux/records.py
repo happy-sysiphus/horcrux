@@ -42,6 +42,7 @@ class ExperimentRecord(BaseModel):
     symptom: Symptom = Field(default_factory=Symptom)
     suspected_causes: list[SuspectedCause] = Field(default_factory=list)
     actions_taken: list[str] = Field(default_factory=list)
+    notes: str = ""  # 특이사항 — 문제로 단정되지 않은 과정 관찰·절차 일탈·환경 특이점
     resolution: Resolution = Field(default_factory=Resolution)
     followup_of: str | None = None  # 후속 실험이면 기준 레코드 id
     needs_review: bool = False
@@ -52,6 +53,10 @@ def records_dir(vault: Path) -> Path:
 
 
 def record_path(vault: Path, record_id: str) -> Path:
+    # record_id는 외부 입력(API 본문·CLI 인자) — 구분자가 섞이면 볼트 밖으로 새어나간다
+    if (not record_id or "/" in record_id or "\\" in record_id or ".." in record_id
+            or Path(record_id).name != record_id):
+        raise ValueError(f"레코드 id가 올바르지 않습니다: {record_id!r}")
     return records_dir(vault) / f"{record_id}.md"
 
 

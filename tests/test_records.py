@@ -1,3 +1,5 @@
+import pytest
+
 from horcrux.records import (
     ExperimentRecord, Parameter, Resolution, SuspectedCause, Symptom,
     list_records, load_record, make_record_id, record_path, save_record, update_resolution,
@@ -61,6 +63,22 @@ def test_roundtrip_with_dashes_in_values(tmp_path):
     loaded, body = load_record(path)
     assert loaded == rec
     assert "---" in body
+
+
+@pytest.mark.parametrize("bad", [
+    "../../other-lab/raw/experiments/x",
+    "..\\..\\other\\x",
+    "sub/dir",
+    "..",
+    "",
+])
+def test_record_path_rejects_traversal(tmp_path, bad):
+    with pytest.raises(ValueError):
+        record_path(tmp_path, bad)
+
+
+def test_record_path_accepts_plain_id(tmp_path):
+    assert record_path(tmp_path, "2026-08-01_x-001").name == "2026-08-01_x-001.md"
 
 
 def test_followup_of_roundtrip(tmp_path):

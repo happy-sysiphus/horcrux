@@ -9,6 +9,8 @@ absorb의 needs_review 스킵, 카탈로그에 해결 정보 포함(확정 원�
 3단 라벨링, ask 입력 힌트.
 개정 2026-07-21(2): LLM 호출을 API(anthropic SDK)에서 로컬 CLI 3종
 (claude/gemini/codex) subprocess로 대체 — MVP는 API 키 없이 CLI 로그인만으로 동작.
+개정 2026-08-05: 특이사항(notes) 필드 신설·게이트 기본 포함(카테고리 5→6개),
+공정변수 단위 필수(value에 표준 기호 포함 + 단위 미상 재질문), 카탈로그에 특이사항 포함.
 
 ## 목적
 
@@ -62,6 +64,7 @@ symptom:                            # §2a 게이트 판정·absorb 실패모드
 suspected_causes:                   # 미확정으로 시작
   - {cause: 타겟 표면 산화, status: unconfirmed}
 actions_taken: [...]
+notes: ""                           # 특이사항 — 문제로 단정 안 된 과정 관찰·절차 일탈·환경 특이점
 resolution:                         # feedback으로 갱신
   resolved: false
   actual_cause: null
@@ -89,15 +92,15 @@ needs_review: false                 # 파싱 실패 시 true
 
 ```yaml
 # <lab-vault>/config.yaml
-required_fields:            # 구조 카테고리 하드 게이트 (기본값 = 5개 전부)
-  [objective, parameters, results, symptom, actions_taken]
+required_fields:            # 구조 카테고리 하드 게이트 (기본값 = 6개 전부)
+  [objective, parameters, results, symptom, actions_taken, notes]
 required_parameters:        # 연구실 커스텀 — 이 파라미터는 반드시 기록돼야 함
   - 기판 온도
   - 챔버 습도
 ```
 
-- `required_fields`: 5개 구조 카테고리(objective/parameters/results/symptom/actions_taken) 중
-  어떤 것을 하드 게이트로 켤지 사용자가 선택. 파일이 없으면 기본값 5개 전부.
+- `required_fields`: 6개 구조 카테고리(objective/parameters/results/symptom/actions_taken/notes) 중
+  어떤 것을 하드 게이트로 켤지 사용자가 선택. 파일이 없으면 기본값 6개 전부.
 - `required_parameters`: 연구실 특화 필수 항목 ("우리 랩은 습도 무조건 기록" 같은 규칙).
 
 **의미 매칭은 LLM, 게이트 판단은 코드**: `required_parameters`는 자유 텍스트라 이름 매칭이
@@ -108,7 +111,12 @@ required_parameters:        # 연구실 커스텀 — 이 파라미터는 반드
 
 구조 카테고리의 채움 판정은 결정론적: objective/results는 비어있지 않음, parameters는 1개 이상,
 symptom은 category≠none 또는 설명 있음(문제 없으면 LLM이 "문제 없음"으로 명시 기록),
-actions_taken은 조치 있음 또는 문제 자체가 없음(category=none).
+actions_taken은 조치 있음 또는 문제 자체가 없음(category=none),
+notes는 비어있지 않음(없으면 LLM이 "특이사항 없음"으로 명시 기록).
+
+**공정변수 단위 게이트**: 파싱 시 value에 단위를 포함하고 표준 기호로 정규화(°C·nm·sccm 등,
+무차원 값은 예외). LLM이 단위 미상 파라미터를 보고하면(파싱된 이름과 대조해 환각 필터)
+코드가 "단위를 알려주세요" 재질문을 생성한다 — required_fields와 무관하게 상시 작동.
 
 **v2 연결**: 온보딩(수준 2)이 하는 일은 이 config.yaml을 LLM이 만들어주는 것. MVP에서는
 사용자가 직접 편집한다 — 두 수준이 같은 파일로 이어진다.
@@ -136,7 +144,7 @@ actions_taken은 조치 있음 또는 문제 자체가 없음(category=none).
 규모 가정: **연구실당 레코드 ≤50건** (캡스톤 데모 기준) — 벡터 계층 제외 결정의 근거.
 
 diagnose는 `retrieval.retrieve()`만 호출한다. 전체 레코드의 frontmatter 요약 카탈로그
-(id·유형·장비·재료·증상·결과·해결 정보)와 위키 아티클 목록(`<kind>/<slug>`)을 생성 LLM에
+(id·유형·장비·재료·증상·결과·해결 정보·특이사항)과 위키 아티클 목록(`<kind>/<slug>`)을 생성 LLM에
 주고 관련 항목을 고르게 함(structured output). 해결 정보는 `해결: <확정 원인>` /
 `미해결` / `문제 없음` — 유사도가 비슷하면 원인이 확정된 사례를 우선하도록 지시해
 feedback 루프가 검색까지 관통한다. 카탈로그에 없는 id(환각)는 코드가 필터.
