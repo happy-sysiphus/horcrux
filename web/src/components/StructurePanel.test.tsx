@@ -1,5 +1,5 @@
 import { render, screen } from "@testing-library/react";
-import StructurePanel from "./StructurePanel";
+import StructurePanel, { gaugeGaps } from "./StructurePanel";
 import type { ParsedLog } from "../types";
 
 const parsed: ParsedLog = {
@@ -8,6 +8,10 @@ const parsed: ParsedLog = {
   symptom: { category: "none", description: "" }, suspected_causes: [],
   actions_taken: [], summary: "", unrecorded_required_parameters: [],
 };
+
+test("단위 재질문은 게이지에서 제외된다", () => {
+  expect(gaugeGaps(["결과?", "증착 온도의 단위를 알려주세요."])).toEqual(["결과?"]);
+});
 
 test("게이지가 (전체-누락)/전체 를 표시한다", () => {
   render(<StructurePanel parsed={parsed} gaps={["결과?", "조치?"]} requiredTotal={5}

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import ChatPane from "../components/ChatPane";
-import StructurePanel from "../components/StructurePanel";
+import StructurePanel, { gaugeGaps } from "../components/StructurePanel";
 import { MobileBar, MobileTabs } from "../nav";
 import { useLogLoop } from "../useLogLoop";
 
@@ -13,7 +13,7 @@ export default function LogChat() {
 
   if (!session) return <div className="p-8 text-slate-500">세션을 찾을 수 없습니다.</div>;
 
-  const done = Math.max(requiredTotal - session.gaps.length, 0);
+  const done = Math.max(requiredTotal - gaugeGaps(session.gaps).length, 0);
 
   return (
     <div className="flex h-screen flex-col md:flex-row">

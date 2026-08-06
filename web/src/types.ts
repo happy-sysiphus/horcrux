@@ -27,6 +27,7 @@ export interface ParsedLog {
   actions_taken: string[];
   summary: string;
   unrecorded_required_parameters: string[];
+  notes?: string;   // 특이사항 — 백엔드(backend 브랜치) 병합 전 응답엔 없다
 }
 
 export interface Reference {
@@ -46,6 +47,7 @@ export interface RecordDetail {
   record: RecordMeta & {
     parameters: Parameter[]; results: string;
     suspected_causes: SuspectedCause[]; actions_taken: string[];
+    notes?: string;   // 특이사항 — 백엔드 병합 전 응답엔 없다
   };
   body: string;
 }

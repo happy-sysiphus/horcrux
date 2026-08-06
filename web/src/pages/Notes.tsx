@@ -125,6 +125,12 @@ export default function Notes() {
                   ))}
                 </div>
               )}
+              {detail.record.notes && (
+                <div className="mt-4">
+                  <div className="font-semibold">특이사항</div>
+                  <div className="mt-1 whitespace-pre-wrap text-sm">{detail.record.notes}</div>
+                </div>
+              )}
               <ReferencesSection recordId={detail.record.id}
                 references={detail.record.references ?? []}
                 records={records.filter((r) => r.id !== detail.record.id)}

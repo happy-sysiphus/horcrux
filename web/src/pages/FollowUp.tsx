@@ -4,7 +4,7 @@ import { api } from "../api";
 import ChatPane from "../components/ChatPane";
 import DiffPanel from "../components/DiffPanel";
 import { resolutionLabel } from "../components/RecordCard";
-import StructurePanel from "../components/StructurePanel";
+import StructurePanel, { gaugeGaps } from "../components/StructurePanel";
 import { MobileBar, MobileTabs } from "../nav";
 import { useLogLoop } from "../useLogLoop";
 import type { RecordDetail } from "../types";
@@ -22,7 +22,7 @@ export default function FollowUp() {
 
   if (!session) return <div className="p-8 text-slate-500">세션을 찾을 수 없습니다.</div>;
 
-  const done = Math.max(requiredTotal - session.gaps.length, 0);
+  const done = Math.max(requiredTotal - gaugeGaps(session.gaps).length, 0);
 
   return (
     <div className="flex h-screen flex-col md:flex-row">

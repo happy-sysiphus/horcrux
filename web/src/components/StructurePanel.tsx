@@ -1,5 +1,12 @@
 import type { ParsedLog } from "../types";
 
+// 게이지 분모(required_fields+required_parameters)에 대응하는 구조 누락만 남긴다.
+// 공정변수 단위 재질문은 필드 누락이 아니라서 세면 필드를 다 채워도 4/6이 된다.
+// ponytail: 서버 질문 문구("~의 단위를 알려주세요")에 결합 — 어긋나면 서버 gaps 구조화로 협의
+export function gaugeGaps(gaps: string[]): string[] {
+  return gaps.filter((g) => !g.includes("단위를 알려주세요"));
+}
+
 function Row({ label, value }: { label: string; value: string }) {
   return value ? (
     <div className="mt-3">
@@ -18,7 +25,7 @@ export default function StructurePanel({ parsed, gaps, requiredTotal, canSave, o
   saveLabel: string;
   className?: string;      // 모바일 탭 전환용 표시/숨김
 }) {
-  const done = Math.max(requiredTotal - gaps.length, 0);
+  const done = Math.max(requiredTotal - gaugeGaps(gaps).length, 0);
   return (
     <div className={`min-h-0 w-full flex-1 flex-col border-slate-200 bg-white p-5 md:h-full md:w-80 md:flex-none md:shrink-0 md:border-l ${className}`}>
       <div className="text-lg font-bold">연구 기록</div>
@@ -35,6 +42,7 @@ export default function StructurePanel({ parsed, gaps, requiredTotal, canSave, o
             <Row label="결과" value={parsed.results} />
             <Row label="증상" value={parsed.symptom.category === "none" ? "문제 없음" : parsed.symptom.description} />
             <Row label="조치" value={parsed.actions_taken.join(", ")} />
+            <Row label="특이사항" value={parsed.notes ?? ""} />
             {gaps.length > 0 && (
               <div className="mt-4">
                 <div className="text-xs text-slate-400">누락 정보</div>
