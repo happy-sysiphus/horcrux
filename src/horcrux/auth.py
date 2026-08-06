@@ -30,7 +30,10 @@ def verify_token(token: str, jwt_secret: str, jwks_url: str | None = None) -> st
             algorithms = [alg]
         else:
             raise ValueError(f"지원하지 않는 토큰 서명 방식: {alg}")
-        payload = jwt.decode(token, key, algorithms=algorithms, audience="authenticated")
+        # iat 검사는 끈다 — 연구실 PC 시계는 서버와 수 초~수 분 어긋나는 게 보통이고,
+        # 0.5초 차이로도 "not yet valid (iat)"가 난다. 만료(exp) 검사는 leeway 60초로 유지.
+        payload = jwt.decode(token, key, algorithms=algorithms, audience="authenticated",
+                             leeway=60, options={"verify_iat": False})
     except jwt.PyJWTError as e:
         raise ValueError(f"토큰 검증 실패: {e}") from None
     if not payload.get("sub"):

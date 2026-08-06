@@ -25,6 +25,13 @@ def test_verify_token_rejects_expired():
         verify_token(tok, SECRET)
 
 
+def test_verify_token_tolerates_future_iat():
+    # 시계가 어긋난 PC에서도 방금 발급된 토큰을 거부하면 안 된다
+    import time
+    tok = make_token(iat=int(time.time()) + 300)
+    assert verify_token(tok, SECRET) == "user-1"
+
+
 def test_verify_token_es256_via_jwks(monkeypatch):
     # 신형 Supabase: ES256 서명 + JWKS 공개 키. 원격 조회는 모킹한다.
     from cryptography.hazmat.primitives.asymmetric import ec
