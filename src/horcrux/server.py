@@ -136,11 +136,13 @@ def create_app(cfg: Config, deploy: DeployCtx | None = None) -> FastAPI:
         if deploy is None:
             return None                       # 로컬 모드 — 인증 없음
         if not authorization or not authorization.startswith("Bearer "):
+            print("(401: Authorization 헤더 없음)")
             raise HTTPException(401, "로그인이 필요합니다")
         try:
             user_id = verify_token(authorization.removeprefix("Bearer "),
                                    deploy.jwt_secret, deploy.jwks_url)
-        except ValueError:
+        except ValueError as e:
+            print(f"(401: {e})")   # 파일럿 진단용 — 검증 실패 사유가 없으면 원인 추적 불가
             raise HTTPException(401, "토큰이 유효하지 않습니다")
         found = deploy.db.lab_for_user(user_id)
         if found is None:
