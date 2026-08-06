@@ -203,6 +203,39 @@ def test_usage_uses_operator_set_limit(deploy_client, monkeypatch):
     assert db.last_limit == 50
 
 
+def _captured_cfg(client, db, monkeypatch, headers):
+    seen = {}
+    def fake_parse(cfg, text, vcfg):
+        seen["cfg"] = cfg
+        from horcrux.ingest import ParsedLog
+        return ParsedLog()
+    monkeypatch.setattr(server, "parse_log", fake_parse)
+    client.post("/api/parse", json={"text": "x"}, headers=headers)
+    return seen["cfg"]
+
+
+def test_codex_without_credential_uses_machine_login(deploy_client, monkeypatch):
+    client, db = deploy_client
+    client.post("/api/labs", json={"name": "랩"}, headers=auth(tok("u1")))
+    r = client.put("/api/labs/settings", json={"llm_mode": "own", "llm_provider": "codex"},
+                   headers=auth(tok("u1")))
+    assert r.status_code == 200
+    assert db.labs["lab-1"]["llm_provider"] == "codex"
+    cfg = _captured_cfg(client, db, monkeypatch, auth(tok("u1")))
+    assert cfg.provider == "codex" and cfg.extra_env is None
+
+
+def test_codex_with_key_injects_openai_env(deploy_client, monkeypatch):
+    client, db = deploy_client
+    client.post("/api/labs", json={"name": "랩"}, headers=auth(tok("u1")))
+    client.put("/api/labs/settings",
+               json={"llm_mode": "own", "llm_provider": "codex", "llm_credential": "sk-openai-x"},
+               headers=auth(tok("u1")))
+    cfg = _captured_cfg(client, db, monkeypatch, auth(tok("u1")))
+    assert cfg.provider == "codex"
+    assert cfg.extra_env == {"OPENAI_API_KEY": "sk-openai-x"}
+
+
 def test_settings_admin_only(deploy_client):
     client, db = deploy_client
     client.post("/api/labs", json={"name": "랩"}, headers=auth(tok("u1")))

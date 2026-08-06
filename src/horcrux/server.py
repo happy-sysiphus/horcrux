@@ -87,8 +87,8 @@ class SettingsIn(BaseModel):
     # 연구실 관리자가 자기 상한을 올릴 수 있으면 중앙 API 키 비용을 통제할 수 없다.
     name: str | None = None
     llm_mode: str | None = None          # 'central'로 되돌리기
-    llm_provider: str | None = None      # own 등록: 'claude' | 'api'
-    llm_credential: str | None = None    # own 등록: 평문 토큰/키 (서버가 암호화)
+    llm_provider: str | None = None      # own 등록: 'claude' | 'api' | 'codex'
+    llm_credential: str | None = None    # own 등록: 평문 토큰/키 (서버가 암호화). codex는 선택
     rotate_invite: bool = False
 
 
@@ -161,6 +161,11 @@ def create_app(cfg: Config, deploy: DeployCtx | None = None) -> FastAPI:
         vault = deploy.data_dir / "vaults" / lab["id"]
         if lab["llm_mode"] == "own":
             cred = deploy.db.get_credential(lab["id"])
+            if lab.get("llm_provider") == "codex":
+                # 코덱스는 키가 선택 — 없으면 서버 머신의 codex 로그인(ChatGPT 구독)을 쓴다
+                secret = cred[1] if cred else None
+                return replace(cfg, vault=vault, provider="codex",
+                               extra_env={"OPENAI_API_KEY": secret} if secret else None)
             if cred is None:
                 raise HTTPException(502, "연구실 LLM 크레덴셜이 없습니다 — 관리자에게 재등록을 요청하세요")
             provider, secret = cred
@@ -310,6 +315,11 @@ def create_app(cfg: Config, deploy: DeployCtx | None = None) -> FastAPI:
         fields = {}
         if inp.name: fields["name"] = inp.name
         if inp.llm_mode: fields["llm_mode"] = inp.llm_mode
+        if inp.llm_provider and not inp.llm_credential:
+            # 키 없는 provider 교체(codex 구독 모드) — 이전 provider의 토큰이 남아 있으면
+            # 엉뚱한 env로 주입되므로 함께 비운다
+            fields["llm_provider"] = inp.llm_provider
+            fields["llm_credential"] = None
         if inp.rotate_invite:
             from .labs import new_invite_code
             fields["invite_code"] = new_invite_code()

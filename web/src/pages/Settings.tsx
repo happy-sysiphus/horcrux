@@ -23,9 +23,10 @@ export default function Settings() {
   if (!lab || me?.role !== "admin")
     return <div className="p-8 text-slate-500">관리자만 접근할 수 있습니다.</div>;
 
-  // own으로 처음 전환할 땐 크레덴셜이 없으면 서버가 502를 내므로 저장을 막는다
+  // own으로 처음 전환할 땐 크레덴셜이 없으면 서버가 502를 내므로 저장을 막는다.
+  // 단 codex는 서버 머신의 로그인(ChatGPT 구독)을 쓸 수 있어 키가 선택이다.
   const modeChangedToOwn = mode === "own" && lab.llm_mode !== "own";
-  const canSave = !busy && !(modeChangedToOwn && !credential.trim());
+  const canSave = !busy && !(modeChangedToOwn && !credential.trim() && provider !== "codex");
   const used = me.usage_today;
   const pct = Math.min(100, Math.round((used / Math.max(1, lab.daily_llm_limit)) * 100));
 
@@ -33,9 +34,13 @@ export default function Settings() {
     const patch: Parameters<typeof api.labSettings>[0] = {};
     if (name.trim() && name.trim() !== lab!.name) patch.name = name.trim();
     if (mode !== lab!.llm_mode) patch.llm_mode = mode;
-    if (mode === "own" && credential.trim()) {
-      patch.llm_provider = provider;
-      patch.llm_credential = credential.trim();
+    if (mode === "own") {
+      if (credential.trim()) {
+        patch.llm_provider = provider;
+        patch.llm_credential = credential.trim();
+      } else if (provider !== (lab!.llm_provider ?? "")) {
+        patch.llm_provider = provider;   // 키 없는 교체 — 서버가 이전 크레덴셜을 비운다
+      }
     }
     void act(patch, "저장했습니다");
   }
@@ -106,11 +111,14 @@ export default function Settings() {
             <div className="mt-3 space-y-2">
               <select value={provider} onChange={(e) => setProvider(e.target.value)}
                 className="w-full rounded border border-slate-300 px-3 py-2 text-sm">
-                <option value="claude">Claude 장기 토큰 (claude setup-token)</option>
-                <option value="api">Anthropic API 키</option>
+                <option value="claude">Claude CLI — 장기 토큰 (claude setup-token)</option>
+                <option value="api">Anthropic API 키 (CLI 없이 직접 호출)</option>
+                <option value="codex">Codex CLI — OpenAI 키 또는 서버 로그인</option>
               </select>
               <input type="password" value={credential} onChange={(e) => setCredential(e.target.value)}
-                placeholder={lab.llm_mode === "own" ? "등록됨 — 교체하려면 새 값 입력" : "토큰/키 입력"}
+                placeholder={provider === "codex"
+                  ? "OpenAI API 키 (비우면 서버의 codex 로그인 사용)"
+                  : lab.llm_mode === "own" ? "등록됨 — 교체하려면 새 값 입력" : "토큰/키 입력"}
                 className="w-full rounded border border-slate-300 px-3 py-2 text-sm" />
               <p className="text-xs text-slate-400">저장 후 값은 다시 표시되지 않습니다.</p>
             </div>
