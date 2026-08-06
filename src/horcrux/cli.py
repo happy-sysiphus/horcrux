@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 
 from .config import load_config
@@ -51,7 +52,7 @@ def main(argv: list[str] | None = None) -> None:
     sd.add_argument("-n", type=int, default=6)
     sv = sub.add_parser("serve", help="웹 UI 서버 (LAB GENE)")
     sv.add_argument("--host", default="127.0.0.1")
-    sv.add_argument("--port", type=int, default=8765)
+    sv.add_argument("--port", type=int, default=int(os.environ.get("PORT", 8765)))
     sub.add_parser("init", help="설정 마법사 (~/.horcrux/config.yaml 생성)")
     args = p.parse_args(argv)
     if args.cmd == "init":

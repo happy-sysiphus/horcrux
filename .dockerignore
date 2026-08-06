@@ -1,0 +1,8 @@
+.git
+.claude
+.pytest_tmp
+web/node_modules
+web/src
+example-vault
+tests
+docs

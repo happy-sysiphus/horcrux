@@ -76,4 +76,47 @@ required_parameters:
 
 공정변수는 단위 포함이 필수다 — 단위 없이 기록하면 재질문한다 (횟수·비율 등 무차원 값 예외).
 
-설계 문서: `docs/superpowers/specs/2026-07-19-horcrux-mvp-design.md`
+## 배포 (Railway + Supabase)
+
+기본은 로컬 단일 볼트 모드로 동작한다. 서버 환경변수 `SUPABASE_URL`이 설정된
+경우에만 JWT 인증 + 연구실(멀티테넌시) 모드로 전환된다 (옵트인).
+
+### 1. Supabase 준비
+
+1. [supabase.com](https://supabase.com)에서 새 프로젝트를 생성한다.
+2. SQL 에디터에서 `db/schema.sql` 내용을 그대로 실행한다 (labs/lab_members/llm_usage
+   테이블 생성 — 파일럿 규모라 마이그레이션 도구 없이 수동 1회 실행).
+3. Authentication → Providers에서 Google 로그인을 켠다.
+4. Authentication → Settings에서 **legacy JWT secret**을 발급한다
+   (`SUPABASE_JWT_SECRET`에 쓴다).
+
+### 2. Railway 배포
+
+1. Railway에서 새 프로젝트를 만들고 GitHub 리포를 연동한다 (푸시 시 `Dockerfile`로
+   자동 배포).
+2. 볼륨을 추가해 `/data`에 마운트한다 (`DATA_DIR` 기본값과 일치 — 연구실별 볼트가
+   이 아래 `vaults/<lab_id>/`로 저장된다).
+3. 환경변수를 설정한다:
+   - `SUPABASE_URL`, `SUPABASE_SERVICE_KEY` — Supabase 프로젝트 URL·service_role 키
+   - `SUPABASE_JWT_SECRET` — 위에서 발급한 legacy JWT secret
+   - `ANTHROPIC_API_KEY`, `HORCRUX_MODEL` — 중앙 LLM 모드 기본 키·모델명
+   - `CRED_ENCRYPTION_KEY` — 연구실 자체 크레덴셜 암호화용 Fernet 키 (생성법 아래)
+   - `DATA_DIR` — 볼트 저장 경로 (기본 `/data`, 위 볼륨 마운트 경로와 맞출 것)
+
+`CRED_ENCRYPTION_KEY`는 Fernet 키다:
+
+```
+python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+```
+
+### 3. LLM 모드
+
+- **중앙 모드(기본)**: `ANTHROPIC_API_KEY`/`HORCRUX_MODEL`로 가입 즉시 동작하며,
+  연구실별 일일 상한(기본 200회)이 적용된다.
+- **연구실 자체 크레덴셜(고급)**: 아직 관리자 화면이 없어 운영자가
+  `PUT /api/labs/settings`를 대신 호출해 등록한다 — `llm_provider: "claude"` +
+  `claude setup-token`으로 발급한 장기 토큰, 또는 `llm_provider: "api"` + Anthropic
+  API 키를 `llm_credential`에 담아 보낸다. 서버가 Fernet으로 암호화해 저장한다.
+
+설계 문서: `docs/superpowers/specs/2026-07-19-horcrux-mvp-design.md`,
+`docs/superpowers/specs/2026-08-06-deployment-auth-design.md`
