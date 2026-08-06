@@ -29,6 +29,7 @@ class DeployCtx:
     db: object          # LabsDB (테스트는 FakeDB)
     jwt_secret: str
     data_dir: Path
+    jwks_url: str | None = None   # 신형 Supabase(ES256 서명)의 공개 키 목록
 
 
 def load_deploy_ctx() -> DeployCtx | None:
@@ -40,6 +41,7 @@ def load_deploy_ctx() -> DeployCtx | None:
                   os.environ["CRED_ENCRYPTION_KEY"]),
         jwt_secret=os.environ["SUPABASE_JWT_SECRET"],
         data_dir=Path(os.environ.get("DATA_DIR", "/data")),
+        jwks_url=f"{url}/auth/v1/.well-known/jwks.json",
     )
 
 
@@ -136,7 +138,8 @@ def create_app(cfg: Config, deploy: DeployCtx | None = None) -> FastAPI:
         if not authorization or not authorization.startswith("Bearer "):
             raise HTTPException(401, "로그인이 필요합니다")
         try:
-            user_id = verify_token(authorization.removeprefix("Bearer "), deploy.jwt_secret)
+            user_id = verify_token(authorization.removeprefix("Bearer "),
+                                   deploy.jwt_secret, deploy.jwks_url)
         except ValueError:
             raise HTTPException(401, "토큰이 유효하지 않습니다")
         found = deploy.db.lab_for_user(user_id)
