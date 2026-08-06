@@ -100,8 +100,8 @@ class FakeRunFn:
         self.calls = []
         self.out = out
 
-    def __call__(self, cmd, prompt):
-        self.calls.append((cmd, prompt))
+    def __call__(self, cmd, prompt, env=None):
+        self.calls.append((cmd, prompt, env))
         return self.out if isinstance(self.out, str) else self.out(cmd)
 
 
@@ -116,7 +116,7 @@ def fake_run(monkeypatch):
 def test_generate_claude_command(fake_run):
     out = generate(Config(vault="v", provider="claude", model="opus"), "시스템", "유저")
     assert out == "응답"
-    cmd, prompt = fake_run.calls[0]
+    cmd, prompt, _ = fake_run.calls[0]
     assert cmd == ["/bin/claude", "-p", "--model", "opus"]
     assert prompt == "시스템\n\n유저"
 
@@ -128,7 +128,7 @@ def test_generate_no_model_omits_flag(fake_run):
 
 def test_generate_gemini_command(fake_run):
     generate(Config(vault="v", provider="gemini"), "s", "u")
-    cmd, prompt = fake_run.calls[0]
+    cmd, prompt, _ = fake_run.calls[0]
     assert cmd == ["/bin/gemini"]
     assert prompt == "s\n\nu"
 
@@ -143,7 +143,7 @@ def test_generate_codex_command_and_last_message_file(fake_run):
     fake_run.out = write_and_return
     out = generate(Config(vault="v", provider="codex"), "s", "u")
     assert out == "최종 메시지"  # stdout(진행 로그) 아닌 -o 파일이 정본
-    cmd, _ = fake_run.calls[0]
+    cmd, _, _ = fake_run.calls[0]
     out_path = cmd[cmd.index("-o") + 1]
     assert cmd == ["/bin/codex", "exec", "-", "--skip-git-repo-check", "--ephemeral",
                    "--sandbox", "read-only", "-o", out_path]
@@ -270,3 +270,32 @@ def test_generate_api_without_key_raises(monkeypatch):
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     with pytest.raises(RuntimeError, match="ANTHROPIC_API_KEY"):
         generate(Config(vault="v", provider="api"), "s", "u")
+
+
+# --- extra_env: 연구실별 크레덴셜 주입 ---
+
+
+def test_run_merges_extra_env(monkeypatch):
+    captured = {}
+
+    class P:
+        pid = 1
+        returncode = 0
+        def communicate(self, prompt=None, timeout=None):
+            return "ok", ""
+
+    def fake_popen(cmd, **kw):
+        captured["env"] = kw.get("env")
+        return P()
+
+    monkeypatch.setattr(llm.subprocess, "Popen", fake_popen)
+    llm._run(["x"], "p", env={"CLAUDE_CODE_OAUTH_TOKEN": "tok"})
+    assert captured["env"]["CLAUDE_CODE_OAUTH_TOKEN"] == "tok"
+    assert "PATH" in captured["env"]  # os.environ 병합 확인
+
+
+def test_generate_passes_extra_env(fake_run):
+    generate(Config(vault="v", provider="claude",
+                    extra_env={"CLAUDE_CODE_OAUTH_TOKEN": "tok"}), "s", "u")
+    # fake_run이 (cmd, prompt, env) 3-튜플을 기록하도록 FakeRunFn.__call__ 시그니처에 env=None 추가
+    assert fake_run.calls[0][2] == {"CLAUDE_CODE_OAUTH_TOKEN": "tok"}

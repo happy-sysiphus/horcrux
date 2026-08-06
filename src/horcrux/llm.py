@@ -26,10 +26,11 @@ def _exe(name: str) -> str:
     return path
 
 
-def _run(cmd: list[str], prompt: str) -> str:
+def _run(cmd: list[str], prompt: str, env: dict[str, str] | None = None) -> str:
     p = subprocess.Popen(
         cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
         text=True, encoding="utf-8",
+        env={**os.environ, **env} if env else None,
     )
     try:
         out, err = p.communicate(prompt, timeout=_TIMEOUT)
@@ -70,9 +71,9 @@ def generate(cfg: Config, system: str, user: str) -> str:
     prompt = f"{system}\n\n{user}"
     model = ["--model", cfg.model] if cfg.model else []
     if cfg.provider == "claude":
-        return _run([_exe("claude"), "-p", *model], prompt)
+        return _run([_exe("claude"), "-p", *model], prompt, env=cfg.extra_env)
     if cfg.provider == "gemini":
-        return _run([_exe("gemini"), *model], prompt)  # stdin 파이프 = headless
+        return _run([_exe("gemini"), *model], prompt, env=cfg.extra_env)  # stdin 파이프 = headless
     if cfg.provider == "codex":
         with tempfile.TemporaryDirectory() as td:
             out = Path(td) / "last.txt"
@@ -80,6 +81,7 @@ def generate(cfg: Config, system: str, user: str) -> str:
                 [_exe("codex"), "exec", "-", "--skip-git-repo-check", "--ephemeral",
                  "--sandbox", "read-only", "-o", str(out), *model],
                 prompt,
+                env=cfg.extra_env,
             )
             # codex stdout은 진행 로그 포함 — 최종 메시지는 -o 파일이 정본
             return out.read_text(encoding="utf-8").strip()
