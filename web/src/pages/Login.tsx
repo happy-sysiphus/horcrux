@@ -2,6 +2,10 @@ import { useAuth } from "../auth";
 
 export default function Login() {
   const { signIn } = useAuth();
+  // 구글/Supabase에서 실패해 돌아오면 ?error=...&error_description=... 이 실려 온다 —
+  // 조용한 루프 대신 원문을 그대로 보여준다
+  const q = new URLSearchParams(window.location.search);
+  const err = q.get("error_description") || q.get("error");
   return (
     <div className="flex h-screen w-full items-center justify-center bg-slate-50 p-4">
       <div className="w-full max-w-xs rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm">
@@ -12,6 +16,7 @@ export default function Login() {
           className="mt-6 w-full rounded-lg border border-slate-300 py-2.5 text-sm font-medium hover:bg-slate-50">
           구글로 계속하기
         </button>
+        {err && <p className="mt-3 break-words text-xs text-red-600">{err}</p>}
       </div>
     </div>
   );
