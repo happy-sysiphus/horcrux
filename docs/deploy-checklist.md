@@ -66,7 +66,14 @@ Supabase → **SQL Editor → New query** 에 이 저장소의 [`db/schema.sql`]
 
 ## 5. 로컬에서 배포 모드로 검증 (여기까지가 이번 작업의 끝선)
 
-암호화 키를 먼저 만든다. PowerShell에서:
+배포 모드는 `supabase` 파이썬 패키지를 쓴다. 기본 설치에는 빠져 있으니 먼저 넣는다.
+**실행 중인 `horcrux serve`가 있으면 먼저 끄고** (켜져 있으면 실행 파일이 잠겨 설치가 깨진다):
+
+```bash
+pip install -e ".[dev,deploy]"
+```
+
+암호화 키를 만든다. PowerShell에서:
 
 ```bash
 python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
@@ -125,6 +132,7 @@ horcrux serve
 | 증상 | 원인 |
 |---|---|
 | 로그인 화면 없이 앱이 바로 뜬다 | `SUPABASE_URL`이 프로세스에 안 들어감 — 서버를 띄운 그 창에서 env를 설정했는지 확인 |
+| 서버 기동 시 `TypeError: 'NoneType' object is not callable` | `supabase` 패키지 미설치 — 5번 맨 위의 `pip install -e ".[dev,deploy]"` |
 | 구글 로그인 후 `redirect_uri_mismatch` | 2번의 Authorized redirect URI가 `https://<ref>.supabase.co/auth/v1/callback` 과 정확히 일치하지 않음 |
 | 로그인은 되는데 앱이 로그인 화면으로 되돌아옴 | 3번 Redirect URLs에 접속 주소가 없음 |
 | 401이 계속 난다 | `SUPABASE_JWT_SECRET`이 다른 프로젝트 값이거나 오타 |
