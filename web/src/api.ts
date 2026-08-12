@@ -30,9 +30,14 @@ async function http<T>(method: string, url: string, body?: unknown): Promise<T> 
 export const api = {
   parse: (text: string) =>
     http<{ parsed: ParsedLog; gaps: string[] }>("POST", "/api/parse", { text }),
-  saveRecord: (text: string, parsed: ParsedLog, followupOf?: string) =>
+  saveRecord: (text: string, parsed: ParsedLog, followupOf?: string,
+    qa?: { question: string; answer: string }[]) =>
     http<{ id: string; path: string }>("POST", "/api/records",
-      { text, parsed, followup_of: followupOf ?? null }),
+      { text, parsed, followup_of: followupOf ?? null, qa: qa ?? [] }),
+  updateRecord: (id: string, patch: Partial<Pick<RecordDetail["record"],
+    "title" | "experiment_type" | "objective" | "equipment" | "materials" | "parameters" |
+    "results" | "symptom" | "suspected_causes" | "actions_taken" | "notes">> & { body?: string }) =>
+    http<RecordDetail>("PUT", `/api/records/${id}`, patch),
   saveRaw: (text: string) =>
     http<{ id: string; path: string }>("POST", "/api/records/raw", { text }),
   ask: (text: string) => http<AskResult>("POST", "/api/ask", { text }),

@@ -16,6 +16,7 @@ export interface SuspectedCause {
 export interface Resolution { resolved: boolean; actual_cause: string | null; note: string }
 
 export interface ParsedLog {
+  title?: string;   // AI가 지은 짧은 제목 — 구버전 응답엔 없다
   experiment_type: string;
   objective: string;
   equipment: string[];
@@ -38,7 +39,7 @@ export interface Reference {
 }
 
 export interface RecordMeta {
-  id: string; date: string; experiment_type: string; objective: string;
+  id: string; date: string; title?: string; experiment_type: string; objective: string;
   equipment: string[]; materials: string[]; symptom: Symptom;
   resolution: Resolution; needs_review: boolean; followup_of: string | null;
   references?: Reference[];   // 백엔드 병합 전 응답엔 없다 — 읽는 쪽에서 ?? []
@@ -86,6 +87,7 @@ export interface Session {
   id: string;
   kind: "log" | "ask" | "followup";
   title: string;
+  pinned?: boolean;        // 사이드바 고정 — 목록 맨 위 정렬
   createdAt: number;
   saved: boolean;          // 레코드로 저장 완료 여부 (log/followup)
   baseId?: string;         // followup: 기준 레코드 id

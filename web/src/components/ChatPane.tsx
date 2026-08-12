@@ -44,16 +44,17 @@ export default function ChatPane({ messages, onSend, busy, placeholder, onRewind
               : "w-fit max-w-[85%] rounded-xl border-l-4 border-blue-500 bg-white px-4 py-3 text-sm shadow-sm whitespace-pre-wrap"}>
               {m.text}
             </div>
-            {/* 터치엔 호버가 없어 모바일은 상시 노출, 데스크톱만 호버로 드러낸다 */}
             {m.role === "user" && uIdx >= 1 && !busy && (onRewind || onFork) && (
-              <div className="mt-1 flex justify-end gap-3 transition-opacity md:opacity-0 md:group-hover:opacity-100">
+              <div className="mt-1 flex justify-end gap-1">
                 {onRewind && (
-                  <button onClick={() => onRewind(uIdx)}
-                    className="text-xs text-slate-400 hover:text-blue-600">↩ 이 답변 전으로 되감기</button>
+                  <button onClick={() => onRewind(uIdx)} aria-label="이 답변 전으로 되감기"
+                    title="이 답변 전으로 되감기"
+                    className="rounded px-1 text-sm text-slate-300 hover:bg-slate-100 hover:text-blue-600">↩</button>
                 )}
                 {onFork && (
-                  <button onClick={() => onFork(uIdx)}
-                    className="text-xs text-slate-400 hover:text-blue-600">⑂ 여기서 포크</button>
+                  <button onClick={() => onFork(uIdx)} aria-label="여기서 새 대화로 포크"
+                    title="여기서 새 대화로 포크"
+                    className="rounded px-1 text-sm text-slate-300 hover:bg-slate-100 hover:text-blue-600">⑂</button>
                 )}
               </div>
             )}
@@ -75,7 +76,7 @@ export default function ChatPane({ messages, onSend, busy, placeholder, onRewind
       <div className="shrink-0 border-t border-slate-200 bg-white p-3 md:p-4">
         <div className="flex items-center gap-2 rounded-full border border-slate-300 px-4 py-2">
           <input value={text} onChange={(e) => setText(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && send(text)}
+            onKeyDown={(e) => e.key === "Enter" && !e.nativeEvent.isComposing && send(text)}
             placeholder={placeholder ?? "메시지를 입력하세요"} disabled={busy}
             className="flex-1 text-sm outline-none disabled:bg-transparent" />
           <button onClick={() => send(text)} disabled={busy || !text.trim()}

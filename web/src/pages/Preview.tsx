@@ -1,12 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { api } from "../api";
 import { MobileBar } from "../nav";
 import { getSession, saveSession } from "../store";
 import { symptomCategoryLabels } from "../types";
-import type { ParsedLog, RecordDetail } from "../types";
+import type { ChatMsg, ParsedLog, RecordDetail } from "../types";
 
-function Field({ label, value, onChange, onBlur, rows = 1 }: {
+export function Field({ label, value, onChange, onBlur, rows = 1 }: {
   label: string; value: string; onChange: (v: string) => void; onBlur?: () => void; rows?: number;
 }) {
   return (
@@ -18,17 +18,29 @@ function Field({ label, value, onChange, onBlur, rows = 1 }: {
   );
 }
 
-function parseParameters(text: string): ParsedLog["parameters"] {
+export function parseParameters(text: string): ParsedLog["parameters"] {
   return text.split(",").map((x) => x.trim()).filter((x) => x.includes("=")).map((x) => {
     const [name, ...rest] = x.split("=");
     return { name: name.trim(), value: rest.join("=").trim(), controllable: true };
   });
 }
 
-const csv = {
+export const csv = {
   serialize: (v: string[]) => v.join(", "),
   parse: (text: string) => text.split(",").map((x) => x.trim()).filter(Boolean),
 };
+
+// 재질문 이력 추출 — chips 달린 AI 메시지가 질문, 바로 다음 사용자 발화가 답
+// ("건너뛰기"는 답이 아니므로 제외). 저장 시 md 본문 ## 재질문 섹션이 된다.
+export function extractQA(messages: ChatMsg[]): { question: string; answer: string }[] {
+  const out: { question: string; answer: string }[] = [];
+  for (let i = 0; i < messages.length - 1; i++) {
+    const q = messages[i], a = messages[i + 1];
+    if (q.role === "ai" && q.chips && a.role === "user" && a.text !== "건너뛰기")
+      out.push({ question: q.text, answer: a.text });
+  }
+  return out;
+}
 
 // 쉼표 구분 텍스트 필드 공통 컴포넌트. typing 중 매 keystroke마다 파싱하면 "=" 없는(또는
 // 아직 비어 있는) 중간 세그먼트가 즉시 버려져 기존 값이 뭉개진다. 그래서 draft는 로컬로만
@@ -58,14 +70,16 @@ export default function Preview() {
   const [baseCause, setBaseCause] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [savedId, setSavedId] = useState<string | null>(null);  // 저장 성공 후 재시도 시 중복 생성 방지
+  // ref로 동기 차단 — state는 반영이 비동기라 연타·Enter 자동 반복에 틈이 생긴다
+  const savingRef = useRef(false);
+  const savedIdRef = useRef<string | null>(null);  // 저장 성공 후 재시도 시 중복 생성 방지
 
   useEffect(() => {
     if (session?.baseId) api.getRecord(session.baseId).then(setBase).catch(() => {});
   }, [session?.baseId]);
 
   if (!session || !p) return <div className="p-8 text-slate-500">미리볼 파싱 결과가 없습니다.</div>;
-  if (session.saved && !savedId)
+  if (session.saved && !savedIdRef.current)
     return (
       <div className="p-8 text-slate-500">
         이미 저장된 대화입니다.{" "}
@@ -76,14 +90,17 @@ export default function Preview() {
   const showBaseUpdate = base && !base.record.resolution.resolved;
 
   async function onSave() {
+    if (savingRef.current) return;
+    savingRef.current = true;
     setBusy(true);
     setError(null);
     try {
       // 레코드는 한 번만 생성 — feedback 실패 후 재시도해도 중복 레코드가 생기지 않게 id 보관
-      let id = savedId;
+      let id = savedIdRef.current;
       if (!id) {
-        id = (await api.saveRecord(session!.rawText, p!, session!.baseId)).id;
-        setSavedId(id);
+        id = (await api.saveRecord(session!.rawText, p!, session!.baseId,
+          extractQA(session!.messages))).id;
+        savedIdRef.current = id;
         session!.saved = true;
         saveSession(session!);
       }
@@ -94,6 +111,7 @@ export default function Preview() {
     } catch (e) {
       setError((e as Error).message);
     } finally {
+      savingRef.current = false;
       setBusy(false);
     }
   }
@@ -108,6 +126,7 @@ export default function Preview() {
       <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
         <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-5">
           <div className="font-semibold">기본 정보</div>
+          <Field label="제목" value={p.title ?? ""} onChange={(v) => set({ title: v })} />
           <Field label="실험 유형" value={p.experiment_type} onChange={(v) => set({ experiment_type: v })} />
           <Field label="실험 목적" value={p.objective} onChange={(v) => set({ objective: v })} />
           <DraftField label="장비 (쉼표 구분)" value={p.equipment} serialize={csv.serialize} parse={csv.parse}
@@ -140,6 +159,7 @@ export default function Preview() {
             serialize={(v) => v.map((c) => c.cause).join(", ")}
             parse={(text) => csv.parse(text).map((cause) => ({ cause, status: "unconfirmed" as const }))}
             onCommit={(suspected_causes) => set({ suspected_causes })} />
+          <Field label="특이사항" value={p.notes ?? ""} rows={2} onChange={(v) => set({ notes: v })} />
         </div>
       </div>
 
