@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import hashlib
 import os
 import threading
+import time
 from collections import defaultdict
 from dataclasses import dataclass, replace
 from datetime import date as _date
@@ -9,7 +11,7 @@ from pathlib import Path
 
 from fastapi import BackgroundTasks, Depends, FastAPI, Header, HTTPException
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from .absorb import run_absorb
 from .auth import AuthCtx, verify_token
@@ -18,10 +20,16 @@ from .diagnose import diagnose_data
 from .feedback import run_feedback
 from .ingest import ParsedLog, missing_required, parse_log, save_unparsed, to_record
 from .labs import LabsDB
-from .records import Reference, list_records, load_record, record_path, save_record, write_md
+from .records import (
+    Parameter, Reference, SuspectedCause, Symptom,
+    list_records, load_record, record_path, save_record, write_md,
+)
 
-_META_KEYS = ("id", "date", "experiment_type", "objective", "equipment", "materials",
+_META_KEYS = ("id", "date", "title", "experiment_type", "objective", "equipment", "materials",
               "symptom", "resolution", "needs_review", "followup_of", "references")
+
+# 연구실 자체 CLI 크레덴셜의 주입 env — 키가 없으면 서버 머신의 CLI 로그인을 그대로 쓴다
+_CLI_KEY_ENV = {"codex": "OPENAI_API_KEY", "gemini": "GEMINI_API_KEY"}
 
 
 @dataclass
@@ -49,10 +57,33 @@ class ParseIn(BaseModel):
     text: str
 
 
+class QAPair(BaseModel):
+    question: str
+    answer: str
+
+
 class RecordIn(BaseModel):
     text: str
     parsed: ParsedLog
     followup_of: str | None = None
+    qa: list[QAPair] = Field(default_factory=list)  # 재질문 이력 — 관례 학습 데이터
+
+
+class RecordUpdateIn(BaseModel):
+    # 연구노트 편집 — None이 아닌 필드만 갱신. id·date·resolution·needs_review·
+    # references·followup_of는 제외(불변이거나 전용 경로가 있다).
+    title: str | None = None
+    experiment_type: str | None = None
+    objective: str | None = None
+    equipment: list[str] | None = None
+    materials: list[str] | None = None
+    parameters: list[Parameter] | None = None
+    results: str | None = None
+    symptom: Symptom | None = None
+    suspected_causes: list[SuspectedCause] | None = None
+    actions_taken: list[str] | None = None
+    notes: str | None = None
+    body: str | None = None
 
 
 class RawIn(BaseModel):
@@ -87,8 +118,8 @@ class SettingsIn(BaseModel):
     # 연구실 관리자가 자기 상한을 올릴 수 있으면 중앙 API 키 비용을 통제할 수 없다.
     name: str | None = None
     llm_mode: str | None = None          # 'central'로 되돌리기
-    llm_provider: str | None = None      # own 등록: 'claude' | 'api' | 'codex'
-    llm_credential: str | None = None    # own 등록: 평문 토큰/키 (서버가 암호화). codex는 선택
+    llm_provider: str | None = None      # own 등록: 'claude' | 'api' | 'codex' | 'gemini'
+    llm_credential: str | None = None    # own 등록: 평문 토큰/키 (서버가 암호화). codex·gemini는 선택
     rotate_invite: bool = False
 
 
@@ -131,6 +162,9 @@ def create_app(cfg: Config, deploy: DeployCtx | None = None) -> FastAPI:
 
     # ponytail: 볼트별 쓰기 락 — 로컬 모드는 키 "local" 하나만 사용 (기존과 동일 동작)
     _locks: dict[str, threading.Lock] = defaultdict(threading.Lock)
+    # 저장 멱등 캐시: lab 키 → (내용 해시, 레코드 id, 시각). 클라이언트가 어떤 경로로든
+    # 같은 저장을 연발해도 레코드는 하나만 생긴다. 메모리라 재시작 시 리셋 — 허용.
+    _last_saves: dict[str, tuple[str, str, float]] = {}
 
     def get_ctx(authorization: str | None = Header(default=None)) -> AuthCtx | None:
         if deploy is None:
@@ -161,11 +195,12 @@ def create_app(cfg: Config, deploy: DeployCtx | None = None) -> FastAPI:
         vault = deploy.data_dir / "vaults" / lab["id"]
         if lab["llm_mode"] == "own":
             cred = deploy.db.get_credential(lab["id"])
-            if lab.get("llm_provider") == "codex":
-                # 코덱스는 키가 선택 — 없으면 서버 머신의 codex 로그인(ChatGPT 구독)을 쓴다
+            prov = lab.get("llm_provider")
+            if prov in _CLI_KEY_ENV:
+                # 코덱스·제미나이는 키가 선택 — 없으면 서버 머신의 CLI 로그인을 쓴다
                 secret = cred[1] if cred else None
-                return replace(cfg, vault=vault, provider="codex",
-                               extra_env={"OPENAI_API_KEY": secret} if secret else None)
+                return replace(cfg, vault=vault, provider=prov,
+                               extra_env={_CLI_KEY_ENV[prov]: secret} if secret else None)
             if cred is None:
                 raise HTTPException(502, "연구실 LLM 크레덴셜이 없습니다 — 관리자에게 재등록을 요청하세요")
             provider, secret = cred
@@ -197,10 +232,19 @@ def create_app(cfg: Config, deploy: DeployCtx | None = None) -> FastAPI:
         check_usage(ctx)
         c = lab_cfg(ctx)
         today = _date.today().isoformat()
+        key = ctx.lab["id"] if (deploy and ctx and ctx.lab) else "local"
+        h = hashlib.sha256(
+            (inp.text + (inp.followup_of or "") + inp.parsed.model_dump_json()).encode()
+        ).hexdigest()
         with lab_lock(ctx):
+            last = _last_saves.get(key)
+            if last and last[0] == h and time.time() - last[2] < 60:
+                return {"id": last[1], "path": ""}  # 동일 내용 재요청 — 기존 레코드로 응답
             rec = to_record(c.vault, inp.parsed, today)
             rec.followup_of = inp.followup_of
-            path = save_record(c.vault, rec, inp.text, inp.parsed.summary)
+            path = save_record(c.vault, rec, inp.text, inp.parsed.summary,
+                               [(q.question, q.answer) for q in inp.qa])
+            _last_saves[key] = (h, rec.id, time.time())
         bg.add_task(_absorb_quietly, c, lab_lock(ctx))
         return {"id": rec.id, "path": str(path)}
 
@@ -243,6 +287,23 @@ def create_app(cfg: Config, deploy: DeployCtx | None = None) -> FastAPI:
         with lab_lock(ctx):
             msg = run_feedback(c, inp.record_id, inp.resolved, inp.cause, inp.note)
         return {"message": msg}
+
+    @app.put("/api/records/{record_id}")
+    def api_update_record(record_id: str, inp: RecordUpdateIn, ctx=Depends(require_lab)):
+        c = lab_cfg(ctx)
+        p = _existing_record(c.vault, record_id)
+        with lab_lock(ctx):
+            rec, body = load_record(p)
+            for f in ("title", "experiment_type", "objective", "equipment", "materials",
+                      "parameters", "results", "symptom", "suspected_causes",
+                      "actions_taken", "notes"):
+                v = getattr(inp, f)
+                if v is not None:
+                    setattr(rec, f, v)
+            if inp.body is not None:
+                body = inp.body
+            write_md(p, rec.model_dump(), body)
+        return {"record": rec.model_dump(), "body": body}  # 상세 응답과 동일 형태
 
     @app.put("/api/records/{record_id}/references")
     def api_put_references(record_id: str, inp: ReferencesIn, ctx=Depends(require_lab)):

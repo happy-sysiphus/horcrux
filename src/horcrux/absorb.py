@@ -20,8 +20,37 @@ ARTICLE_SYSTEM = """연구실 위키 아티클을 편찬한다. 한국어, 위�
 출력은 아티클 본문 마크다운만 (frontmatter 없이)."""
 
 
+CONVENTIONS_SYSTEM = """연구실의 기록 관례를 편찬한다. 입력은 실험 기록들의 재질문(Q&A)과 기존 관례 문서다.
+반복되는 질문·답 패턴에서 다음 파싱에 쓸 간결한 규칙을 뽑아라:
+- 단위 관례 (예: 온도 단위 미표기 시 °C로 해석)
+- 용어·장비 별칭 (예: 'ALD'는 ALD-02를 뜻함)
+- 자주 누락되지만 답이 일정한 항목의 기본값
+한 규칙당 한 줄. 근거가 반복된 것만 넣고, 한 번뿐이거나 불확실한 것은 넣지 마라.
+기존 문서의 규칙은 새 사례와 모순되지 않으면 유지한다.
+출력은 마크다운 목록만 (frontmatter·제목 없이)."""
+
+
 def wiki_dir(vault: Path) -> Path:
     return vault / "wiki"
+
+
+def conventions_path(vault: Path) -> Path:
+    return wiki_dir(vault) / "_관례.md"
+
+
+def compile_conventions(cfg: Config, new_texts: list[str]) -> bool:
+    """새 레코드의 ## 재질문 이력으로 연구실 관례 문서를 갱신. 재질문 없으면 no-op."""
+    qa_texts = [t for t in new_texts if "## 재질문" in t]
+    if not qa_texts:
+        return False
+    p = conventions_path(cfg.vault)
+    existing = read_md(p)[1] if p.exists() else ""
+    user = (f"## 기존 관례\n{existing or '(없음)'}\n\n## 새 기록 (재질문 포함)\n\n"
+            + "\n\n---\n\n".join(qa_texts))
+    body = generate(cfg, CONVENTIONS_SYSTEM, user)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    write_md(p, {"name": "연구실 관례", "updated": _date.today().isoformat()}, body)
+    return True
 
 
 def _absorb_log_path(vault: Path) -> Path:
@@ -94,6 +123,10 @@ def run_absorb(cfg: Config) -> int:
             meta["symptom_category"] = cat
         write_md(art_path, meta, body)
         updated += 1
+    try:
+        compile_conventions(cfg, [texts_by_id[r.id] for r in new])
+    except Exception as e:  # 관례 편찬 실패가 위키 편찬을 막으면 안 된다
+        print(f"(관례 편찬 실패: {e})")
     for rec in new:
         log[rec.id] = True
     _absorb_log_path(cfg.vault).parent.mkdir(parents=True, exist_ok=True)

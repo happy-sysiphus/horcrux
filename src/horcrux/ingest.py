@@ -9,11 +9,13 @@ from .config import Config, VaultConfig, load_vault_config
 from .llm import generate_parsed
 from .records import (
     ExperimentRecord, Parameter, SuspectedCause, Symptom,
-    make_record_id, save_record,
+    make_record_id, read_md, save_record,
 )
 
 PARSE_SYSTEM = """당신은 wet lab 실험 로그를 구조화하는 조수다.
 연구원이 쓴 자연어 실험 로그에서 다음을 추출하라:
+- title: 6~15자의 짧은 제목. 핵심 재료·현상 위주, 조사 최소화 (예: "HfO2 증착 두께 편차",
+  "MXene 에칭 수율 개선"). 목적 문장을 그대로 옮기지 마라.
 - experiment_type: 실험 유형 (자유 텍스트, 짧게. 예: 박막 증착, 졸겔 합성)
 - objective: 실험 목적
 - equipment / materials: 사용한 장비·재료 이름 목록
@@ -37,6 +39,7 @@ PARSE_SYSTEM = """당신은 wet lab 실험 로그를 구조화하는 조수다.
 
 
 class ParsedLog(BaseModel):
+    title: str = ""
     experiment_type: str = ""
     objective: str = ""
     equipment: list[str] = Field(default_factory=list)
@@ -52,12 +55,26 @@ class ParsedLog(BaseModel):
     parameters_missing_unit: list[str] = Field(default_factory=list)
 
 
+def _conventions(vault: Path) -> str:
+    """관례 문서 본문 — absorb가 재질문 이력에서 편찬한 연구실별 규칙 (없으면 빈 문자열)."""
+    p = vault / "wiki" / "_관례.md"
+    if not p.exists():
+        return ""
+    try:
+        return read_md(p)[1].strip()
+    except Exception:
+        return ""  # 손상된 관례 문서가 파싱을 막으면 안 된다
+
+
 def parse_log(cfg: Config, text: str, vcfg: VaultConfig | None = None) -> ParsedLog:
     vcfg = vcfg or load_vault_config(cfg.vault)
     user = text
     if vcfg.required_parameters:
         req = "\n".join(f"- {n}" for n in vcfg.required_parameters)
         user = f"{text}\n\n[연구실 필수 파라미터 목록]\n{req}"
+    conv = _conventions(cfg.vault)
+    if conv:
+        user = (f"{user}\n\n[연구실 관례 — 파싱에 반영하되 로그 내용과 모순되면 로그 우선]\n{conv}")
     try:
         p = generate_parsed(cfg, PARSE_SYSTEM, user, ParsedLog)
     except Exception:

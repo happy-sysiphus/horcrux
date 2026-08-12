@@ -42,6 +42,7 @@ class Resolution(BaseModel):
 class ExperimentRecord(BaseModel):
     id: str
     date: str
+    title: str = ""  # AI가 지은 6~15자 제목 — 표시용. 구기록엔 없음(빈 문자열 fallback)
     experiment_type: str = ""
     objective: str = ""
     equipment: list[str] = Field(default_factory=list)
@@ -94,8 +95,13 @@ def read_md(path: Path) -> tuple[dict, str]:
     return yaml.safe_load(fm), body.strip()
 
 
-def save_record(vault: Path, rec: ExperimentRecord, raw_log: str, summary: str) -> Path:
+def save_record(vault: Path, rec: ExperimentRecord, raw_log: str, summary: str,
+                qa: list[tuple[str, str]] | None = None) -> Path:
     body = f"## 원문 로그\n\n{raw_log}\n\n## 정리\n\n{summary}"
+    if qa:
+        # 재질문 이력은 본문에 남긴다 — 위키·관례 편찬 LLM이 자연히 읽는 위치
+        pairs = "\n".join(f"- Q: {q}\n  A: {a}" for q, a in qa)
+        body += f"\n\n## 재질문\n\n{pairs}"
     path = record_path(vault, rec.id)
     write_md(path, rec.model_dump(), body)
     return path
