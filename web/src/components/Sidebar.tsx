@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth";
+import Logo from "./Logo";
 import { useNav } from "../nav";
 import { deleteSession, listSessions, saveSession } from "../store";
 import type { Session } from "../types";
@@ -133,8 +134,8 @@ export default function Sidebar() {
         ${open ? "flex" : "hidden"}`}>
         <nav className="hidden w-52 shrink-0 flex-col gap-1 bg-slate-900 p-4 text-slate-200 md:flex">
           <div className="mb-8 flex items-center gap-2 font-bold tracking-wide">
-            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-600">⚗</span>
-            LAB GENE
+            <Logo className="h-8 w-8" onDark />
+            <span>LAB <span className="text-sky-400">GENE</span></span>
           </div>
           {navLinks(true)}
           {mode === "deploy" && me?.lab && (
@@ -151,8 +152,8 @@ export default function Sidebar() {
 
         <aside className="flex min-w-0 flex-1 flex-col bg-white md:w-60 md:flex-none md:border-r md:border-slate-200">
           <div className="flex items-center gap-2 bg-slate-900 px-4 py-3 font-bold tracking-wide text-white md:hidden">
-            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-600 text-sm">⚗</span>
-            LAB GENE
+            <Logo className="h-7 w-7" onDark />
+            <span>LAB <span className="text-sky-400">GENE</span></span>
           </div>
           <div className="p-3">
             <button onClick={() => { close(); nav("/"); }}
