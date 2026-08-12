@@ -45,7 +45,7 @@ export function extractQA(messages: ChatMsg[]): { question: string; answer: stri
 // 쉼표 구분 텍스트 필드 공통 컴포넌트. typing 중 매 keystroke마다 파싱하면 "=" 없는(또는
 // 아직 비어 있는) 중간 세그먼트가 즉시 버려져 기존 값이 뭉개진다. 그래서 draft는 로컬로만
 // 들고, blur 시점에만 parse+onCommit으로 실제 값에 반영한다.
-function DraftField<T>({ label, value, serialize, parse, onCommit, rows = 1 }: {
+export function DraftField<T>({ label, value, serialize, parse, onCommit, rows = 1 }: {
   label: string; value: T; serialize: (v: T) => string; parse: (text: string) => T;
   onCommit: (v: T) => void; rows?: number;
 }) {

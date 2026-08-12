@@ -24,9 +24,10 @@ export default function Settings() {
     return <div className="p-8 text-slate-500">관리자만 접근할 수 있습니다.</div>;
 
   // own으로 처음 전환할 땐 크레덴셜이 없으면 서버가 502를 내므로 저장을 막는다.
-  // 단 codex는 서버 머신의 로그인(ChatGPT 구독)을 쓸 수 있어 키가 선택이다.
+  // 단 codex·gemini는 서버 머신의 CLI 로그인을 쓸 수 있어 키가 선택이다.
+  const keyOptional = provider === "codex" || provider === "gemini";
   const modeChangedToOwn = mode === "own" && lab.llm_mode !== "own";
-  const canSave = !busy && !(modeChangedToOwn && !credential.trim() && provider !== "codex");
+  const canSave = !busy && !(modeChangedToOwn && !credential.trim() && !keyOptional);
   const used = me.usage_today;
   const pct = Math.min(100, Math.round((used / Math.max(1, lab.daily_llm_limit)) * 100));
 
@@ -114,10 +115,11 @@ export default function Settings() {
                 <option value="claude">Claude CLI — 장기 토큰 (claude setup-token)</option>
                 <option value="api">Anthropic API 키 (CLI 없이 직접 호출)</option>
                 <option value="codex">Codex CLI — OpenAI 키 또는 서버 로그인</option>
+                <option value="gemini">Gemini CLI — API 키 또는 서버 로그인</option>
               </select>
               <input type="password" value={credential} onChange={(e) => setCredential(e.target.value)}
-                placeholder={provider === "codex"
-                  ? "OpenAI API 키 (비우면 서버의 codex 로그인 사용)"
+                placeholder={keyOptional
+                  ? "API 키 (비우면 서버의 CLI 로그인 사용)"
                   : lab.llm_mode === "own" ? "등록됨 — 교체하려면 새 값 입력" : "토큰/키 입력"}
                 className="w-full rounded border border-slate-300 px-3 py-2 text-sm" />
               <p className="text-xs text-slate-400">저장 후 값은 다시 표시되지 않습니다.</p>

@@ -1,6 +1,7 @@
 import type { RecordMeta } from "../types";
 
-type CardMeta = Pick<RecordMeta, "id" | "experiment_type" | "objective" | "symptom" | "resolution">;
+type CardMeta = Pick<RecordMeta, "id" | "experiment_type" | "objective" | "symptom" | "resolution">
+  & { title?: string };
 
 export function resolutionLabel(m: CardMeta): { text: string; cls: string } {
   if (m.symptom.category === "none") return { text: "문제 없음", cls: "bg-slate-100 text-slate-600" };
@@ -16,7 +17,7 @@ export default function RecordCard({ meta, onClick }: { meta: CardMeta; onClick:
     <button onClick={onClick}
       className="w-full rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm hover:border-blue-400">
       <div className="text-xs font-medium text-blue-600">{meta.id}</div>
-      <div className="mt-1 font-medium">{meta.objective || meta.experiment_type || "(제목 없음)"}</div>
+      <div className="mt-1 font-medium">{meta.title || meta.objective || meta.experiment_type || "(제목 없음)"}</div>
       <span className={`mt-2 inline-block rounded-full px-2 py-0.5 text-xs ${label.cls}`}>{label.text}</span>
     </button>
   );

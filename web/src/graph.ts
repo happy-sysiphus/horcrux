@@ -45,12 +45,12 @@ export function buildGraph(records: RecordMeta[]): { nodes: GraphNode[]; links: 
     return id;
   };
 
-  // 라벨은 다른 화면과 동일하게 objective 우선 — experiment_type은 저카디널리티라
+  // 라벨은 다른 화면과 동일하게 title→objective 우선 — experiment_type은 저카디널리티라
   // (같은 유형 반복 실험이 흔함) 라벨이 전부 겹친다. full=id는 호버 툴팁용(유일값).
   for (const r of records)
     nodes.set(r.id, {
       id: r.id, kind: "exp",
-      label: truncate(r.objective || r.experiment_type || r.id, EXP_LABEL_MAX),
+      label: truncate(r.title || r.objective || r.experiment_type || r.id, EXP_LABEL_MAX),
       full: r.id, recIds: [r.id],
     });
 

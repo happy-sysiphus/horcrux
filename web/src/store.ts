@@ -12,6 +12,7 @@ function normalize(s: Partial<Session>): Session {
     gapIndex: s.gapIndex ?? 0, answers: Array.isArray(s.answers) ? s.answers : [],
     rounds: s.rounds ?? 0, askResult: s.askResult,
     history: Array.isArray(s.history) ? s.history : [],
+    pinned: s.pinned ?? false,
   };
 }
 function readAll(): Session[] {
@@ -27,7 +28,8 @@ function writeAll(list: Session[]) {
 }
 
 export function listSessions(): Session[] {
-  return readAll().sort((a, b) => b.createdAt - a.createdAt);
+  return readAll().sort((a, b) =>
+    (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0) || b.createdAt - a.createdAt);
 }
 export function getSession(id: string): Session | undefined {
   return readAll().find((s) => s.id === id);

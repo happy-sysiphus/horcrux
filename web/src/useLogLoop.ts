@@ -39,9 +39,9 @@ export function useLogLoop(sid: string | undefined) {
       s.gaps = gaps;
       s.gapIndex = 0;
       s.answers = [];
-      if (parsed.experiment_type || parsed.objective)
+      if (parsed.title || parsed.experiment_type || parsed.objective)
         s.title = (s.kind === "followup" ? "후속: " : "") +
-          (parsed.experiment_type || parsed.objective.slice(0, 30));
+          (parsed.title || parsed.experiment_type || parsed.objective.slice(0, 30));
       if (gaps.length > 0 && s.rounds < MAX_ROUNDS) {
         s.messages.push({ role: "ai", text: gaps[0], chips: chipsFor(gaps[0]) });
       } else if (gaps.length === 0) {

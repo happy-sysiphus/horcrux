@@ -6,6 +6,7 @@ import { resolutionLabel } from "../components/RecordCard";
 import ReferencesSection from "../components/ReferencesSection";
 import { MobileBar } from "../nav";
 import { newSession, saveSession } from "../store";
+import { csv, DraftField, Field, parseParameters } from "./Preview";
 import { symptomCategoryLabels } from "../types";
 import type { RecordDetail, RecordMeta } from "../types";
 
@@ -18,13 +19,39 @@ export default function Notes() {
   const [to, setTo] = useState("");
   const [detail, setDetail] = useState<RecordDetail | null>(null);
   const [modal, setModal] = useState(false);
+  const [draft, setDraft] = useState<RecordDetail | null>(null);  // null이 아니면 편집 모드
+  const [saveBusy, setSaveBusy] = useState(false);
+  const [saveErr, setSaveErr] = useState<string | null>(null);
 
   const loadList = () => api.listRecords().then((r) => setRecords(r.records));
   useEffect(() => { void loadList(); }, []);
   useEffect(() => {
     if (id) api.getRecord(id).then(setDetail).catch(() => setDetail(null));
     else setDetail(null);
+    setDraft(null); setSaveErr(null);
   }, [id]);
+
+  const setR = (patch: Partial<RecordDetail["record"]>) =>
+    setDraft((d) => d && { ...d, record: { ...d.record, ...patch } });
+
+  async function saveEdit() {
+    setSaveBusy(true); setSaveErr(null);
+    try {
+      const r = draft!.record;
+      const res = await api.updateRecord(r.id, {
+        title: r.title ?? "", experiment_type: r.experiment_type, objective: r.objective,
+        equipment: r.equipment, materials: r.materials, parameters: r.parameters,
+        results: r.results, symptom: r.symptom, suspected_causes: r.suspected_causes,
+        actions_taken: r.actions_taken, notes: r.notes ?? "", body: draft!.body,
+      });
+      setDetail(res); setDraft(null);
+      void loadList();
+    } catch (e) {
+      setSaveErr((e as Error).message);
+    } finally {
+      setSaveBusy(false);
+    }
+  }
 
   const filtered = records.filter((r) =>
     [r.id, r.experiment_type, r.objective, ...r.equipment, ...r.materials, r.symptom.description]
@@ -65,7 +92,7 @@ export default function Notes() {
                 <button key={r.id} onClick={() => nav(`/notes/${r.id}`)}
                   className={`w-full rounded-lg border p-3 text-left ${id === r.id ? "border-blue-400 bg-blue-50" : "border-slate-200 hover:bg-slate-50"}`}>
                   <div className="text-xs text-blue-600">{r.id}</div>
-                  <div className="truncate text-sm font-medium">{r.objective || r.experiment_type || "(제목 없음)"}</div>
+                  <div className="truncate text-sm font-medium">{r.title || r.objective || r.experiment_type || "(제목 없음)"}</div>
                   <span className={`mt-1 inline-block rounded-full px-2 py-0.5 text-xs ${label.cls}`}>{label.text}</span>
                 </button>
               );
@@ -84,13 +111,71 @@ export default function Notes() {
         </header>
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-6 md:p-8">
           {!detail && <div className="text-slate-400">왼쪽에서 기록을 선택하세요.</div>}
-          {detail && (
+          {detail && draft && (
+            <div className="mx-auto max-w-3xl space-y-3">
+              <div className="text-xs font-medium text-blue-600">{draft.record.id} — 수정 중</div>
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-5">
+                  <Field label="제목" value={draft.record.title ?? ""} onChange={(v) => setR({ title: v })} />
+                  <Field label="실험 유형" value={draft.record.experiment_type} onChange={(v) => setR({ experiment_type: v })} />
+                  <Field label="실험 목적" value={draft.record.objective} onChange={(v) => setR({ objective: v })} />
+                  <DraftField label="장비 (쉼표 구분)" value={draft.record.equipment}
+                    serialize={csv.serialize} parse={csv.parse} onCommit={(equipment) => setR({ equipment })} />
+                  <DraftField label="재료 (쉼표 구분)" value={draft.record.materials}
+                    serialize={csv.serialize} parse={csv.parse} onCommit={(materials) => setR({ materials })} />
+                </div>
+                <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-5">
+                  <DraftField label="공정변수 (이름=값, 쉼표 구분)" value={draft.record.parameters}
+                    serialize={(v) => v.map((x) => `${x.name}=${x.value}`).join(", ")}
+                    parse={parseParameters} onCommit={(parameters) => setR({ parameters })} />
+                  <Field label="결과" value={draft.record.results} rows={2} onChange={(v) => setR({ results: v })} />
+                  <label className="block">
+                    <div className="text-xs text-slate-400">증상 분류</div>
+                    <select value={draft.record.symptom.category}
+                      onChange={(e) => setR({ symptom: { ...draft.record.symptom, category: e.target.value as RecordDetail["record"]["symptom"]["category"] } })}
+                      className="mt-1 w-full rounded border border-slate-200 px-2 py-1.5 text-sm font-medium">
+                      {Object.entries(symptomCategoryLabels).map(([value, label]) => (
+                        <option key={value} value={value}>{label}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <Field label="증상 설명" value={draft.record.symptom.description} rows={2}
+                    onChange={(v) => setR({ symptom: { ...draft.record.symptom, description: v } })} />
+                  <DraftField label="조치 (쉼표 구분)" value={draft.record.actions_taken}
+                    serialize={csv.serialize} parse={csv.parse} onCommit={(actions_taken) => setR({ actions_taken })} />
+                  <DraftField label="원인 후보 (쉼표 구분)" value={draft.record.suspected_causes}
+                    serialize={(v) => v.map((c) => c.cause).join(", ")}
+                    parse={(text) => csv.parse(text).map((cause) => ({ cause, status: "unconfirmed" as const }))}
+                    onCommit={(suspected_causes) => setR({ suspected_causes })} />
+                  <Field label="특이사항" value={draft.record.notes ?? ""} rows={2} onChange={(v) => setR({ notes: v })} />
+                </div>
+              </div>
+              <label className="block rounded-xl border border-slate-200 bg-white p-5">
+                <div className="text-xs text-slate-400">본문 (md — 원문 로그·정리·재질문)</div>
+                <textarea value={draft.body} rows={14}
+                  onChange={(e) => setDraft((d) => d && { ...d, body: e.target.value })}
+                  className="mt-1 w-full rounded border border-slate-200 px-2 py-1.5 font-mono text-xs" />
+              </label>
+              {saveErr && <div className="text-sm text-red-600">{saveErr}</div>}
+              <div className="flex justify-end gap-3">
+                <button onClick={() => setDraft(null)} disabled={saveBusy}
+                  className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm">취소</button>
+                <button onClick={() => void saveEdit()} disabled={saveBusy}
+                  className="rounded-lg bg-blue-600 px-4 py-2 text-sm text-white disabled:opacity-40">
+                  {saveBusy ? "저장 중..." : "저장"}
+                </button>
+              </div>
+            </div>
+          )}
+          {detail && !draft && (
             <div className="mx-auto max-w-3xl">
               <div className="text-xs font-medium text-blue-600">{detail.record.id}</div>
-              <h1 className="mt-1 text-xl font-bold md:text-2xl">{detail.record.objective || detail.record.experiment_type}</h1>
+              <h1 className="mt-1 text-xl font-bold md:text-2xl">{detail.record.title || detail.record.objective || detail.record.experiment_type}</h1>
               <div className="mt-1 text-sm text-slate-500">
                 {detail.record.date} · {detail.record.experiment_type}
                 {detail.record.needs_review && <span className="ml-2 rounded bg-red-100 px-2 py-0.5 text-xs text-red-700">검토 필요</span>}
+                <button onClick={() => setDraft(structuredClone(detail))}
+                  className="ml-3 text-xs text-blue-600 underline">✏ 수정</button>
               </div>
               {detail.record.followup_of && (
                 <button onClick={() => nav(`/notes/${detail.record.followup_of}`)}
