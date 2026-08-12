@@ -1,9 +1,12 @@
 import { useState } from "react";
+import { FileText, FlaskConical, Link2, Paperclip, Plus, X, type LucideIcon } from "lucide-react";
 import { api } from "../api";
 import { fetchDoiTitle, normalizeDoi } from "../refs";
 import type { RecordMeta, Reference } from "../types";
 
-const ICON: Record<Reference["type"], string> = { paper: "📄", link: "🔗", record: "🧪", pdf: "📎" };
+const ICON: Record<Reference["type"], LucideIcon> = { paper: FileText, link: Link2, record: FlaskConical, pdf: Paperclip };
+const ICON_COLOR: Record<Reference["type"], string> = { paper: "text-violet-600", link: "text-sky-600", record: "text-emerald-600", pdf: "text-slate-500" };
+const ACCESSIBLE_TYPE_LABEL: Record<Reference["type"], string> = { paper: "논문", link: "링크", record: "내부 기록", pdf: "PDF" };
 const TYPE_LABEL = { paper: "논문", link: "링크", record: "레코드" } as const;
 
 export default function ReferencesSection({ recordId, references, records, onSaved, onOpenRecord }: {
@@ -72,7 +75,13 @@ export default function ReferencesSection({ recordId, references, records, onSav
       <div className="mt-1 space-y-1">
         {references.map((ref, i) => (
           <div key={i} className="flex items-center gap-2 text-sm">
-            <span>{ICON[ref.type] ?? "📎"}</span>
+            {(() => {
+              const Icon = ICON[ref.type] ?? Paperclip;
+              return <>
+                <Icon aria-hidden strokeWidth={2} size={16} className={ICON_COLOR[ref.type] ?? "text-slate-500"} />
+                <span className="sr-only">{ACCESSIBLE_TYPE_LABEL[ref.type] ?? "첨부 자료"}</span>
+              </>;
+            })()}
             {ref.type === "record" ? (
               <button onClick={() => ref.record_id && onOpenRecord(ref.record_id)}
                 className="min-w-0 truncate text-left text-blue-600 hover:underline">{label(ref)}</button>
@@ -81,7 +90,7 @@ export default function ReferencesSection({ recordId, references, records, onSav
                 className="min-w-0 truncate text-blue-600 hover:underline">{label(ref)}</a>
             )}
             <button onClick={() => void put(references.filter((_, j) => j !== i))} disabled={busy}
-              aria-label="참조 삭제" className="ml-auto px-2 text-slate-400 hover:text-red-500">✕</button>
+              aria-label="참조 삭제" className="ml-auto p-1 text-slate-400 hover:text-red-500"><X aria-hidden strokeWidth={2} size={16} /></button>
           </div>
         ))}
         {references.length === 0 && !open && <div className="text-sm text-slate-400">아직 없음</div>}
@@ -89,8 +98,8 @@ export default function ReferencesSection({ recordId, references, records, onSav
 
       {!open && (
         <button onClick={() => setOpen(true)}
-          className="mt-2 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm hover:bg-slate-50">
-          ＋ 참고문헌 추가
+          className="mt-2 inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm hover:bg-slate-50">
+          <Plus aria-hidden strokeWidth={2} size={16} />참고문헌 추가
         </button>
       )}
       {open && (
@@ -98,8 +107,11 @@ export default function ReferencesSection({ recordId, references, records, onSav
           <div className="flex gap-2">
             {(Object.keys(TYPE_LABEL) as (keyof typeof TYPE_LABEL)[]).map((t) => (
               <button key={t} onClick={() => setType(t)}
-                className={`rounded-full border px-3 py-1 text-sm ${type === t ? "border-blue-600 bg-blue-50 text-blue-700" : "border-slate-300"}`}>
-                {ICON[t]} {TYPE_LABEL[t]}
+                className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm ${type === t ? "border-blue-600 bg-blue-50 text-blue-700" : "border-slate-300"}`}>
+                {(() => {
+                  const Icon = ICON[t];
+                  return <><Icon aria-hidden strokeWidth={2} size={16} className={ICON_COLOR[t]} />{TYPE_LABEL[t]}</>;
+                })()}
               </button>
             ))}
           </div>

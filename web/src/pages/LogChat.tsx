@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { TriangleAlert } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import ChatPane from "../components/ChatPane";
 import StructurePanel, { gaugeGaps } from "../components/StructurePanel";
@@ -26,7 +27,7 @@ export default function LogChat() {
         </header>
         <MobileTabs value={tab} onChange={setTab} tabs={[
           { key: "chat", label: "대화" },
-          { key: "panel", label: <>구조 · {done}/{requiredTotal}{session.gaps.length > 0 && " ⚠"}</> },
+          { key: "panel", label: <span className="inline-flex items-center gap-1">구조 · {done}/{requiredTotal}{session.gaps.length > 0 && <TriangleAlert className="text-amber-600" size={14} strokeWidth={2} aria-hidden="true" />}</span> },
         ]} />
         {error && (
           <div className="flex flex-wrap items-center gap-3 bg-red-50 px-6 py-2 text-sm text-red-700">

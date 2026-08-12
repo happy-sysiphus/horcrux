@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { GitFork, Send, Undo2 } from "lucide-react";
 import type { ChatMsg } from "../types";
 
 export default function ChatPane({ messages, onSend, busy, placeholder, onRewind, onFork }: {
@@ -49,12 +50,12 @@ export default function ChatPane({ messages, onSend, busy, placeholder, onRewind
                 {onRewind && (
                   <button onClick={() => onRewind(uIdx)} aria-label="이 답변 전으로 되감기"
                     title="이 답변 전으로 되감기"
-                    className="rounded px-1 text-sm text-slate-300 hover:bg-slate-100 hover:text-blue-600">↩</button>
+                    className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-blue-600"><Undo2 aria-hidden strokeWidth={2} size={16} /></button>
                 )}
                 {onFork && (
                   <button onClick={() => onFork(uIdx)} aria-label="여기서 새 대화로 포크"
                     title="여기서 새 대화로 포크"
-                    className="rounded px-1 text-sm text-slate-300 hover:bg-slate-100 hover:text-blue-600">⑂</button>
+                    className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-blue-600"><GitFork aria-hidden strokeWidth={2} size={16} /></button>
                 )}
               </div>
             )}
@@ -79,8 +80,8 @@ export default function ChatPane({ messages, onSend, busy, placeholder, onRewind
             onKeyDown={(e) => e.key === "Enter" && !e.nativeEvent.isComposing && send(text)}
             placeholder={placeholder ?? "메시지를 입력하세요"} disabled={busy}
             className="flex-1 text-sm outline-none disabled:bg-transparent" />
-          <button onClick={() => send(text)} disabled={busy || !text.trim()}
-            className="rounded-full bg-blue-600 px-4 py-1.5 text-sm text-white disabled:opacity-40">➤</button>
+          <button onClick={() => send(text)} disabled={busy || !text.trim()} aria-label="메시지 전송"
+            className="grid size-10 shrink-0 place-items-center rounded-full bg-blue-600 text-white disabled:opacity-40"><Send aria-hidden strokeWidth={2} size={16} /></button>
         </div>
       </div>
     </div>

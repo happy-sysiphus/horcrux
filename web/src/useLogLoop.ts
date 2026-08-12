@@ -90,7 +90,7 @@ export function useLogLoop(sid: string | undefined) {
     if (!snap || busy) return;
     const ns = newSession(s.kind, s.baseId);
     Object.assign(ns, structuredClone(snap));
-    ns.title = "⑂ " + s.title;
+    ns.title = "포크 · " + s.title;
     ns.history = [];
     saveSession(ns);
     nav(s.kind === "followup" ? `/followup/${ns.id}` : `/log/${ns.id}`);

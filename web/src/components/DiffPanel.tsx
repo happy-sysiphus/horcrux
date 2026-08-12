@@ -1,3 +1,4 @@
+import { ArrowRight, CircleCheck, CirclePlus, RefreshCw } from "lucide-react";
 import type { ParsedLog, Parameter, RecordDetail } from "../types";
 
 export interface ParamDiff {
@@ -44,16 +45,16 @@ export default function DiffPanel({ base, current }: {
       {diff && (
         <div className="mt-2 space-y-1 text-sm">
           {diff.changed.map((d) => (
-            <div key={d.name} data-testid="diff-changed" className="rounded bg-blue-50 px-2 py-1">
-              🔵 <b>{d.name}</b>: {d.from} ➔ {d.to}
+            <div key={d.name} data-testid="diff-changed" className="flex items-center gap-1.5 rounded bg-blue-50 px-2 py-1 text-blue-800">
+              <RefreshCw aria-hidden strokeWidth={2} size={16} className="shrink-0 text-blue-600" /> <b>{d.name}</b>: {d.from} <ArrowRight aria-hidden strokeWidth={2} size={14} className="shrink-0 text-blue-500" /> {d.to}
             </div>
           ))}
           {diff.added.map((d) => (
-            <div key={d.name} className="rounded bg-purple-50 px-2 py-1">🟣 <b>{d.name}</b>: {d.value} (신규)</div>
+            <div key={d.name} className="flex items-center gap-1.5 rounded bg-violet-50 px-2 py-1 text-violet-800"><CirclePlus aria-hidden strokeWidth={2} size={16} className="shrink-0 text-violet-600" /><b>{d.name}</b>: {d.value} (신규)</div>
           ))}
           {diff.kept.map((d) => (
-            <div key={d.name} data-testid="diff-kept" className="rounded bg-emerald-50 px-2 py-1">
-              🟢 {d.name}: {d.value} (유지)
+            <div key={d.name} data-testid="diff-kept" className="flex items-center gap-1.5 rounded bg-emerald-50 px-2 py-1 text-emerald-800">
+              <CircleCheck aria-hidden strokeWidth={2} size={16} className="shrink-0 text-emerald-600" />{d.name}: {d.value} (유지)
             </div>
           ))}
           {diff.changed.length === 0 && diff.added.length === 0 && (

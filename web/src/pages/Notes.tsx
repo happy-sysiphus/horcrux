@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { ArrowLeft, Circle, CircleCheck, CircleX, Pencil, X } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { api } from "../api";
 import FeedbackModal from "../components/FeedbackModal";
@@ -82,7 +83,10 @@ export default function Notes() {
             <input type="date" value={to} onChange={(e) => setTo(e.target.value)}
               className="min-w-0 flex-1 rounded border border-slate-200 px-2 py-1.5" />
             {(from || to) && (
-              <button onClick={() => { setFrom(""); setTo(""); }} className="px-1 text-slate-400 hover:text-slate-600">✕</button>
+              <button onClick={() => { setFrom(""); setTo(""); }} aria-label="기간 필터 초기화" title="기간 필터 초기화"
+                className="px-1 text-slate-400 hover:text-blue-600">
+                <X size={14} strokeWidth={2} aria-hidden="true" />
+              </button>
             )}
           </div>
           <div className="mt-3 space-y-2">
@@ -106,7 +110,10 @@ export default function Notes() {
         {/* 상세에서는 햄버거 대신 목록으로 돌아가는 경로를 준다 */}
         <header className="flex shrink-0 items-center gap-2 border-b border-slate-200 bg-white px-3 py-2 md:hidden">
           <button onClick={() => nav("/notes")}
-            className="rounded-lg bg-slate-100 px-3 py-2 text-sm">← 목록</button>
+            className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-3 py-2 text-sm">
+            <ArrowLeft size={16} strokeWidth={2} aria-hidden="true" />
+            목록
+          </button>
           <div className="min-w-0 truncate text-sm font-bold">{detail?.record.id ?? "기록"}</div>
         </header>
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-6 md:p-8">
@@ -175,12 +182,18 @@ export default function Notes() {
                 {detail.record.date} · {detail.record.experiment_type}
                 {detail.record.needs_review && <span className="ml-2 rounded bg-red-100 px-2 py-0.5 text-xs text-red-700">검토 필요</span>}
                 <button onClick={() => setDraft(structuredClone(detail))}
-                  className="ml-3 text-xs text-blue-600 underline">✏ 수정</button>
+                  className="ml-3 inline-flex items-center gap-1 text-xs text-blue-600 underline">
+                  <Pencil size={14} strokeWidth={2} aria-hidden="true" />
+                  수정
+                </button>
               </div>
               {detail.record.followup_of && (
                 <button onClick={() => nav(`/notes/${detail.record.followup_of}`)}
                   className="mt-2 text-sm text-blue-600 underline">
-                  ← 기준 실험: {detail.record.followup_of}
+                  <span className="inline-flex items-center gap-1">
+                    <ArrowLeft size={16} strokeWidth={2} aria-hidden="true" />
+                    기준 실험: {detail.record.followup_of}
+                  </span>
                 </button>
               )}
               <div className="mt-5 grid grid-cols-2 gap-3 rounded-xl bg-slate-100 p-4 text-sm md:grid-cols-4">
@@ -203,8 +216,15 @@ export default function Notes() {
                 <div className="mt-4">
                   <div className="font-semibold">원인 후보</div>
                   {detail.record.suspected_causes.map((c) => (
-                    <div key={c.cause} className="mt-1 text-sm">
-                      {c.status === "confirmed" ? "✅" : c.status === "rejected" ? "❌" : "◻"} {c.cause}
+                    <div key={c.cause} className="mt-1 flex items-center gap-1 text-sm">
+                      {c.status === "confirmed" ? (
+                        <CircleCheck size={16} strokeWidth={2} className="shrink-0 text-emerald-600" aria-hidden="true" />
+                      ) : c.status === "rejected" ? (
+                        <CircleX size={16} strokeWidth={2} className="shrink-0 text-red-600" aria-hidden="true" />
+                      ) : (
+                        <Circle size={16} strokeWidth={2} className="shrink-0 text-slate-400" aria-hidden="true" />
+                      )}
+                      {c.cause}
                       <span className="ml-1 text-xs text-slate-400">({c.status})</span>
                     </div>
                   ))}

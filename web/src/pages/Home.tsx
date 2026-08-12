@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Send } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { MobileBar } from "../nav";
 import { listSessions, newSession, saveSession } from "../store";
@@ -41,7 +42,7 @@ export default function Home() {
         <div className="flex justify-end">
           <button onClick={() => start(mode)} disabled={!text.trim()}
             className="rounded-full bg-blue-600 px-5 py-2 text-sm text-white disabled:opacity-40">
-            전송 ➤
+            <span className="inline-flex items-center gap-2">전송 <Send size={16} strokeWidth={2} aria-hidden="true" /></span>
           </button>
         </div>
       </div>

@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, type ReactNode } from "react";
+import { Menu } from "lucide-react";
 
 // 모바일 드로어 개폐 상태 — 사이드바(App)와 각 페이지의 햄버거 버튼이 공유한다.
 const NavCtx = createContext<{ open: boolean; setOpen: (v: boolean) => void }>({
@@ -18,7 +19,7 @@ export function MobileBar({ title, subtitle }: { title: string; subtitle?: strin
     <header className="flex shrink-0 items-center gap-3 border-b border-slate-200 bg-white px-3 py-2 md:hidden">
       <button onClick={() => setOpen(true)} aria-label="메뉴 열기"
         className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-slate-100 text-lg">
-        ☰
+        <Menu aria-hidden="true" className="size-5 text-slate-600" strokeWidth={2} />
       </button>
       <div className="min-w-0">
         <div className="truncate font-bold">{title}</div>

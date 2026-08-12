@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import ForceGraph2D from "react-force-graph-2d";
 import { api } from "../api";
@@ -167,7 +168,7 @@ export default function Graph() {
           <div className="flex items-start justify-between">
             <div className="text-xs font-semibold text-slate-400">노드 상세</div>
             <button onClick={() => setSelected(null)} aria-label="닫기"
-              className="-mt-1 px-2 text-slate-400 md:hidden">✕</button>
+              className="-mt-1 px-2 text-slate-400 hover:text-blue-600 md:hidden"><X size={16} strokeWidth={2} aria-hidden="true" /></button>
           </div>
           <span className={`mt-3 inline-block rounded-full px-2 py-0.5 text-xs ${KIND_CHIP[selected.kind]}`}>
             {KIND_LABEL[selected.kind]}

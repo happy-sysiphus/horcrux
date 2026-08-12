@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { CircleCheck, Info, TriangleAlert } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { api } from "../api";
 import ChatPane from "../components/ChatPane";
@@ -9,9 +10,9 @@ import type { Session } from "../types";
 
 // 근거 3단 라벨 (스펙 ③) — records 단도 표시해야 3단이 성립
 const BANNERS = {
-  none: { text: "⚠ 축적된 유사 사례가 없어 일반 지식 기반 조언입니다.", cls: "bg-red-50 text-red-700" },
-  wiki: { text: "ℹ 유사 레코드는 없어 연구실 위키 아티클 기반 안내입니다.", cls: "bg-blue-50 text-blue-700" },
-  records: { text: "✓ 연구실 실험 기록을 근거로 한 답변입니다.", cls: "bg-emerald-50 text-emerald-700" },
+  none: { text: "축적된 유사 사례가 없어 일반 지식 기반 조언입니다.", Icon: TriangleAlert, cls: "bg-red-50 text-red-700" },
+  wiki: { text: "유사 레코드는 없어 연구실 위키 아티클 기반 안내입니다.", Icon: Info, cls: "bg-blue-50 text-blue-700" },
+  records: { text: "연구실 실험 기록을 근거로 한 답변입니다.", Icon: CircleCheck, cls: "bg-emerald-50 text-emerald-700" },
 } as const;
 
 export default function Ask() {
@@ -69,7 +70,12 @@ export default function Ask() {
           { key: "chat", label: "대화" },
           { key: "panel", label: <>유사 사례{session.askResult ? ` · ${session.askResult.records.length}` : ""}</> },
         ]} />
-        {banner && <div className={`px-6 py-2 text-sm ${banner.cls}`}>{banner.text}</div>}
+        {banner && (
+          <div className={`flex items-center gap-2 px-6 py-2 text-sm ${banner.cls}`}>
+            <banner.Icon size={16} strokeWidth={2} aria-hidden="true" />
+            {banner.text}
+          </div>
+        )}
         {error && (
           <div className="flex flex-wrap gap-3 bg-red-50 px-6 py-2 text-sm text-red-700">
             {error}

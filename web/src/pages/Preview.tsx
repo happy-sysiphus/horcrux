@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { ArrowRight, Sparkles } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { api } from "../api";
 import { MobileBar } from "../nav";
@@ -176,7 +177,11 @@ export default function Preview() {
         <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-5">
           <label className="flex items-center gap-2 font-medium">
             <input type="checkbox" checked={updateBase} onChange={(e) => setUpdateBase(e.target.checked)} />
-            기준 실험({base!.record.id})의 원인 상태 업데이트 — 미확정 ➔ 확인됨
+            <span className="inline-flex items-center gap-1">
+              기준 실험({base!.record.id})의 원인 상태 업데이트 — 미확정
+              <ArrowRight size={16} strokeWidth={2} className="shrink-0 text-emerald-600" aria-hidden="true" />
+              확인됨
+            </span>
           </label>
           {updateBase && (
             <div className="mt-3 flex flex-wrap gap-2">
@@ -193,8 +198,9 @@ export default function Preview() {
         </div>
       )}
 
-      <div className="mt-4 rounded-xl bg-blue-50 p-4 text-sm text-blue-800">
-        ⑂ 저장하면 자동으로 생성됩니다 — 위키 아티클(백그라운드 편찬)
+      <div className="mt-4 flex items-center gap-2 rounded-xl bg-blue-50 p-4 text-sm text-blue-800">
+        <Sparkles size={16} strokeWidth={2} className="shrink-0 text-blue-600" aria-hidden="true" />
+        <span>저장하면 자동으로 생성됩니다 — 위키 아티클(백그라운드 편찬)</span>
       </div>
 
       {error && <div className="mt-3 text-sm text-red-600">{error}</div>}

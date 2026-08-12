@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Ellipsis, NotebookText, Pencil, Pin, PinOff, Plus, Settings, Sparkles, Trash2, Network } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth";
 import Logo from "./Logo";
@@ -13,9 +14,9 @@ function sessionPath(s: Session): string {
 }
 
 const LINKS = [
-  { to: "/", icon: "✦", label: "AI 워크스페이스", match: (p: string) => p === "/" },
-  { to: "/notes", icon: "▤", label: "연구노트", match: (p: string) => p.startsWith("/notes") },
-  { to: "/graph", icon: "◈", label: "그래프뷰", match: (p: string) => p.startsWith("/graph") },
+  { to: "/", icon: Sparkles, label: "AI 워크스페이스", match: (p: string) => p === "/" },
+  { to: "/notes", icon: NotebookText, label: "연구노트", match: (p: string) => p.startsWith("/notes") },
+  { to: "/graph", icon: Network, label: "그래프뷰", match: (p: string) => p.startsWith("/graph") },
 ];
 
 export default function Sidebar() {
@@ -59,7 +60,7 @@ export default function Sidebar() {
   }
 
   const links = me?.role === "admin"
-    ? [...LINKS, { to: "/settings", icon: "⚙", label: "연구실 설정",
+    ? [...LINKS, { to: "/settings", icon: Settings, label: "연구실 설정",
                    match: (p: string) => p.startsWith("/settings") }]
     : LINKS;
   const sessions = listSessions();
@@ -69,10 +70,11 @@ export default function Sidebar() {
   const navLinks = (dark: boolean) =>
     links.map((l) => (
       <Link key={l.to} to={l.to} onClick={close}
-        className={`rounded px-3 py-2 text-sm ${dark
-          ? (l.match(loc.pathname) ? "bg-slate-700" : "hover:bg-slate-800")
+        className={`flex items-center gap-2 rounded px-3 py-2 text-sm ${dark
+          ? (l.match(loc.pathname) ? "bg-slate-700 text-sky-300" : "text-slate-300 hover:bg-slate-800 hover:text-slate-100")
           : (l.match(loc.pathname) ? "bg-blue-50 font-medium text-blue-700" : "text-slate-700 hover:bg-slate-100")}`}>
-        {l.icon} {l.label}
+        <l.icon aria-hidden strokeWidth={2} size={20} />
+        {l.label}
       </Link>
     ));
 
@@ -94,24 +96,24 @@ export default function Sidebar() {
               <Link to={sessionPath(s)} onClick={close}
                 className={`block truncate rounded px-3 py-2 pr-8 text-sm ${
                   loc.pathname.includes(s.id) ? "bg-blue-50 text-blue-700" : "text-slate-700 hover:bg-slate-100"}`}>
-                {s.pinned && <span className="mr-1">📌</span>}{s.title}
+                {s.pinned && <Pin aria-hidden strokeWidth={2} size={14} className="mr-1 inline-block text-slate-500" />}{s.title}
               </Link>
             )}
             {renaming !== s.id && (
               <button onClick={() => setMenuFor(menuFor === s.id ? null : s.id)} aria-label="세션 메뉴"
                 className="absolute right-1 top-1/2 -translate-y-1/2 rounded px-1.5 text-slate-400
-                  hover:bg-slate-200 md:opacity-0 md:group-hover/row:opacity-100">⋯</button>
+                  hover:bg-slate-200 hover:text-blue-600 md:opacity-0 md:group-hover/row:opacity-100"><Ellipsis aria-hidden strokeWidth={2} size={16} /></button>
             )}
             {menuFor === s.id && (
               <div className="absolute right-1 top-8 z-[60] w-36 rounded-lg border border-slate-200 bg-white py-1 text-sm shadow-lg">
                 <button onClick={() => togglePin(s)}
-                  className="block w-full px-3 py-1.5 text-left hover:bg-slate-50">
-                  📌 {s.pinned ? "고정 해제" : "고정"}
+                  className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-slate-50">
+                  {s.pinned ? <PinOff aria-hidden strokeWidth={2} size={16} /> : <Pin aria-hidden strokeWidth={2} size={16} />} {s.pinned ? "고정 해제" : "고정"}
                 </button>
                 <button onClick={() => startRename(s)}
-                  className="block w-full px-3 py-1.5 text-left hover:bg-slate-50">✏ 이름 변경</button>
+                  className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-slate-50"><Pencil aria-hidden strokeWidth={2} size={16} />이름 변경</button>
                 <button onClick={() => removeSession(s)}
-                  className="block w-full px-3 py-1.5 text-left text-red-600 hover:bg-red-50">🗑 삭제</button>
+                  className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-red-600 hover:bg-red-50"><Trash2 aria-hidden strokeWidth={2} size={16} />삭제</button>
               </div>
             )}
           </div>
@@ -157,8 +159,8 @@ export default function Sidebar() {
           </div>
           <div className="p-3">
             <button onClick={() => { close(); nav("/"); }}
-              className="w-full rounded-lg bg-blue-600 py-2 text-sm font-medium text-white hover:bg-blue-700">
-              + 새 대화
+              className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 py-2 text-sm font-medium text-white hover:bg-blue-700">
+              <Plus aria-hidden strokeWidth={2} size={16} />새 대화
             </button>
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-3">
