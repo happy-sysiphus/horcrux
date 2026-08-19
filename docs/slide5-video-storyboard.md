@@ -1,52 +1,53 @@
-# 슬라이드 5 영상 콘티 v3 (30초 · 실사 + 화면 녹화 + AI 생성 하이브리드)
+# 슬라이드 5 영상 콘티 v5 — 최종 (30초 · AI 생성 + 화면 녹화 하이브리드)
 
-구조: 실사 오프닝 → 폰 줌인 → 데스크톱 앱(입력→파싱→재질문→저장→연구노트→그래프뷰)
-→ **그래프 화면에서 그대로 이어지는 확장**: 노드 증식·줌아웃 → 대한민국을 뒤덮고 →
-지구 전체 네트워크 → **지구가 거대 플라스크에 담기고** → 정면 샷 줌아웃 → 화이트 → 로고.
+구조: AI 오프닝(연구자 뒷모습 폰 타이핑) → 폰 줌인 → 데스크톱 앱(입력→파싱→재질문→
+저장→연구노트→그래프뷰) → 그래프에서 줌아웃하면 **다시 그 연구자** → 놀라 폰 낙하 →
+폰부터 실험실 전체가 노드로 변환 → **노드가 된 실험실이 플라스크에 담김** → 정면 샷
+줌아웃 → 화이트 → 로고.
 
-오디오: 나레이션·BGM 없음, **효과음만** (발표자 발화가 나레이션 역할). 후반부(컷 5)는
-발화와 1:1 싱크가 아니라 "자산이 쌓여 확장된다"는 분위기 싱크다 — 의도된 선택.
+오디오: 나레이션·BGM 없음, **효과음만**. 라벨(빨간 지시선 자막)은 딱 2개 — 컷 3
+"자연어 입력", 컷 4 "재질문". 후반부(컷 5)는 발화와 분위기 싱크(의도된 선택).
 
-| 컷 | 시간 | 내용 | 제작 방식 |
+| 컷 | 시간 | 내용 | 제작 |
 |---|---|---|---|
-| 1 | 0~4s | 실험 끝, 연구원이 폰을 들고 타이핑 | 실사 촬영 (또는 AI 생성) |
-| 2 | 4~7s | 폰 화면으로 쭉 줌인 → 화이트 플래시 → 컴퓨터 화면 | 실사 + 편집 전환 |
-| 3 | 7~11s | 실험 로그가 입력되는 앱 화면 | 화면 녹화 (데스크톱) |
-| 4 | 11~17s | 파싱→재질문→저장 → 연구노트 → **그래프뷰 진입** | 화면 녹화 (데스크톱) |
-| 5 | 17~27.5s | 노드 증식·줌아웃 → 대한민국 → 지구 → **플라스크에 담김** | AI 생성 (3클립 체인) |
-| 6 | 27.5~30s | 정면 샷 줌아웃 → 화이트 → LAB GENE 로고 | 편집 (CapCut) |
+| 1 | 0~4s | 연구자(뒷모습) 실험 마치고 폰 타이핑 | AI 생성 |
+| 2 | 4~7s | 폰 화면 줌인 → 화이트 플래시 → 데스크톱 화면 | 편집 전환 |
+| 3 | 7~11s | 자연어 로그 입력 | 화면 녹화 |
+| 4 | 11~17s | 파싱→재질문→저장→연구노트→**그래프뷰 진입** | 화면 녹화 |
+| 5 | 17~27.5s | 줌아웃→연구자 복귀→폰 낙하·노드화→실험실 전체 노드화→플라스크 담김→정면 샷 | 합성 + AI 2클립 |
+| 6 | 27.5~30s | 정면 샷 줌아웃 → 화이트 → LAB GENE 로고 | 편집 |
 
 ---
 
-## 컷 1 — 실사: 폰 타이핑 (0~4초)
+## 컷 1 — AI 생성: 연구자 뒷모습 폰 타이핑 (0~4초)
 
-**추천: 직접 촬영.** 실험실(또는 실험대 느낌 배경)에서 팀원이 장갑을 벗으며 폰을
-집어 들고 타이핑. 손과 폰 화면이 보이는 오버숄더/클로즈업. 조명은 실험실 형광등
-그대로, 흔들림 약간 있어도 됨(현장감). 폰 화면 내용은 식별 안 되는 거리면 뭐든 OK.
+**이 클립의 마지막 프레임이 컷 5의 앵커다** — 폰 화면이 어깨 너머로 뚜렷이 보이고,
+폰 위치가 안정적이어야 한다(컷 5 박자 1의 합성 대상).
 
-**대안: AI 생성 프롬프트**:
+> EN: Over-the-shoulder cinematic shot from behind: a researcher in a white lab coat,
+> back to camera, finishes an experiment at a cluttered wet-lab bench (beakers, ALD
+> equipment panel with indicator lights), pulls off one nitrile glove, picks up a
+> smartphone and types quickly with both thumbs. The phone screen is clearly visible
+> over the shoulder and held steady, face never shown. Shallow depth of field,
+> fluorescent laboratory lighting, realistic, 4k, stable framing, no text overlays,
+> no narration, no music, no watermark.
 
-> EN: Handheld cinematic shot, a young researcher in a white lab coat and nitrile
-> gloves finishes an experiment at a cluttered wet-lab bench (beakers, ALD equipment
-> panel with indicator lights), pulls off one glove, picks up a smartphone and starts
-> typing quickly with both thumbs. Over-the-shoulder framing, shallow depth of field,
-> fluorescent laboratory lighting, realistic, 4k, no text overlays, no narration, no music.
-
-> KO: 핸드헬드 시네마틱 숏. 흰 실험 가운과 니트릴 장갑을 낀 젊은 연구원이 실험 기구가
-> 널린 웻랩 실험대(비커, 지시등이 켜진 ALD 장비 패널)에서 실험을 마치고, 장갑 한쪽을
-> 벗은 뒤 스마트폰을 집어 양손 엄지로 빠르게 타이핑한다. 오버숄더 구도, 얕은 심도,
-> 실험실 형광등 조명, 실사풍, 4k. 텍스트 오버레이·나레이션·음악 없음.
+> KO: 뒤에서 잡은 오버숄더 시네마틱 숏: 흰 실험 가운을 입은 연구원이 카메라에 등을
+> 보인 채, 실험 기구가 널린 웻랩 실험대(비커, 지시등 켜진 ALD 장비 패널)에서 실험을
+> 마치고 니트릴 장갑 한쪽을 벗은 뒤 스마트폰을 집어 양손 엄지로 빠르게 타이핑한다.
+> 폰 화면이 어깨 너머로 뚜렷하게 보이고 흔들림 없이 유지되며, 얼굴은 나오지 않는다.
+> 얕은 심도, 실험실 형광등 조명, 실사풍, 4k, 안정된 구도. 텍스트 오버레이·나레이션·
+> 음악·워터마크 없음.
 
 ## 컷 2 — 줌인 전환: 폰 → 컴퓨터 화면 (4~7초)
 
-- 컷 1의 마지막 1초에서 폰 화면을 향해 **디지털 줌인**(CapCut 키프레임 확대).
-- 화면이 프레임을 거의 채우는 순간 → **0.2초 화이트 플래시** → **데스크톱 앱
-  화면(컷 3)으로 전환**. "폰으로 기록한 게 연구실 시스템에 들어갔다"는 읽힘.
-- 라벨 없음 — 전환 컷은 깨끗하게.
+- 컷 1 마지막 1초에 폰 화면을 향해 **디지털 줌인**(캡컷 배율 키프레임).
+- 화면이 프레임을 거의 채우는 순간 → **0.2초 화이트 플래시** → 데스크톱 앱 화면(컷 3).
+- 라벨 없음.
 
 ## 컷 3 — 화면 녹화: 자연어 로그 입력 (7~11초)
 
-**녹화 준비** (5분):
+**녹화 준비**:
 
 ```powershell
 $env:HORCRUX_VAULT = "C:\Users\지완\labgene-demo-vault"
@@ -54,150 +55,124 @@ cd C:\Users\지완\claude\horcrux\.claude\worktrees\web-impl
 horcrux serve
 ```
 
-- 크롬 시크릿 창, **F11 전체화면**, 줌 110~125%, 북마크바 숨김. 데스크톱 뷰로 녹화.
-- 데모 볼트는 기록 11건 + 그래프 완전 연결(노드 30개) 상태로 시딩돼 있다.
-- 홈 → "실험 기록" → 아래 로그 붙여넣기. **타이핑 연출**: 붙여넣은 뒤 마지막 한
-  문장만 지웠다가 실제로 타이핑하면 "치는 중" 장면이 나온다.
+- 크롬 시크릿 창, F11 전체화면, 줌 110~125%. 데모 볼트는 기록 11건 + 그래프 완전
+  연결(노드 30개) 시딩 상태.
+- 홈 → "실험 기록" → 아래 로그 붙여넣기 (마지막 한 문장은 지웠다가 실제 타이핑
+  — "치는 중" 장면 연출):
 
 ```
 오늘 ALD로 HfO2 증착 다시 함. 이번엔 사이클을 350으로 올려봄. 온도 250도,
 압력 1.2, 오존은 80으로 유지. 두께는 11.7nm 나옴. 막질 확인은 다음주에 XRD로 할 예정.
 ```
 
-- **후반**: 입력창 클로즈업. 라벨: **자연어 입력**.
+- 라벨: **자연어 입력**.
 
 ## 컷 4 — 화면 녹화: 파싱→재질문→저장→그래프뷰 진입 (11~17초)
 
-한 컷에 많이 들어가므로 **넉넉히 찍고 편집에서 점프컷+속도 램프로 6초에 압축**한다.
+넉넉히 찍고 편집에서 점프컷+속도 램프로 6초 압축.
 
-1. 전송 → 파싱 로딩("분석 중...") — 편집에서 1초로 압축
-2. 구조 패널에 필드 채워진 모습(제목·ALD-02·단위 붙은 파라미터 — 관례 반영 결과)
-3. AI 재질문 → 칩 **"문제 없음"** → **"특이사항 없음"** 클릭
-4. "검토 후 저장" → **저장하기** → 연구노트 목록(제목 달린 기록들) 1초 스침
-5. 사이드바 **그래프뷰** 클릭 → **진입 순간 노드들이 퍼지며 자리잡는 애니메이션**
-   (이 마지막 1~1.5초가 컷 5로 이어지는 브릿지다)
+1. 전송 → 파싱 로딩(편집에서 1초로)
+2. 구조 패널 채워진 모습(제목·ALD-02·단위 붙은 파라미터)
+3. 재질문 → 칩 "문제 없음" → "특이사항 없음"
+4. 저장하기 → 연구노트 목록 1초 스침
+5. 그래프뷰 클릭 → **노드들이 퍼지며 자리잡는 진입 애니메이션**
+   → **안정된 마지막 프레임을 스크린샷으로 저장** (컷 5 박자 1의 소스)
 
-- **후반**: 재질문 말풍선 클로즈업, 저장 클릭 리플. 라벨 2개: **AI 구조화**, **재질문**.
-- **그래프 화면이 안정된 마지막 프레임을 스크린샷으로 저장**해둔다 — 컷 5 생성의
-  시작 이미지가 된다.
+- 라벨: **재질문** (말풍선 옆). 저장 클릭에 리플.
 
-## 컷 5 — AI 생성: 노드 증식 → 대한민국 → 지구 → 플라스크 (17~27.5초)
+## 컷 5 — 합성 + AI 생성: 원상복귀 → 노드화 → 플라스크 (17~27.5초)
 
-컷 4의 그래프 화면에서 **그대로 이어지는** 확장 시퀀스. **3클립 체인**으로 뽑는다 —
-각 클립의 마지막 프레임을 캡처해 다음 클립의 시작 이미지로 넣는다:
-A(그래프→대한민국) → B(대한민국→지구) → C(지구→플라스크 담김→정면 샷).
-편집에서 각 3~3.5초로 트리밍한다.
+### 박자 1 (17~19s) — 캡컷 합성: 그래프 → 연구자 복귀
 
-**클립 A — 그래프 증식 → 대한민국 (약 5초)**
-(시작 이미지: 컷 4 마지막 그래프 스크린샷)
+- AI 생성이 아니라 **캡컷 키프레임 합성**: 컷 4의 그래프 화면(전체 프레임)을 배율
+  키프레임으로 축소시키며, 아래 레이어에 컷 1 영상(연구자 뒷모습)을 깐다. 그래프
+  화면이 **연구자 폰 화면 위치로 빨려 들어가며** 안착 — "이 모든 게 폰 안의 서비스였다"
+  는 원상복귀 리빌.
+- 그래프 클립의 끝 크기·위치를 폰 화면에 맞추는 키프레임 2개면 된다.
 
-> EN: Starting exactly from this screenshot of a web app's knowledge-graph view
-> (colored nodes connected by thin lines on a light background): new glowing nodes
-> keep popping into existence one after another, edges multiplying, the network
-> growing denser and denser. The camera pulls back steadily; as it zooms out, the
-> light background gradually dissolves into a night-time satellite view of South
-> Korea, and the multiplying glowing blue nodes now blanket the entire Korean
-> peninsula like interconnected city lights. Smooth continuous zoom-out, seamless
-> transition, cinematic, no text, no narration, no music, no watermark.
+### 박자 2~3 (19~24s) — AI 클립 D1: 놀람·폰 낙하 → 실험실 전체 노드화
 
-> KO: 웹앱 지식 그래프 화면 스크린샷(밝은 배경 위 색색 노드와 가는 연결선)에서
-> 정확히 이어서 시작: 빛나는 새 노드들이 연쇄적으로 계속 생겨나고 엣지가 증식하며
-> 네트워크가 점점 조밀해진다. 카메라가 꾸준히 뒤로 빠지고, 줌아웃되는 동안 밝은
-> 배경이 서서히 밤의 대한민국 위성 뷰로 디졸브되며, 증식하는 파란 발광 노드들이
-> 한반도 전체를 도시 불빛처럼 뒤덮는다. 부드럽고 끊김 없는 줌아웃, 심리스 전환,
-> 시네마틱. 텍스트·나레이션·음악·워터마크 없음.
+(시작 이미지: 컷 1 마지막 프레임)
 
-**클립 B — 대한민국 → 지구 (약 4초)**
-(시작 이미지: 클립 A 마지막 프레임)
+> EN: Seamless continuation from this frame, over-the-shoulder back view of a
+> researcher in a white lab coat holding a phone in a laboratory: the researcher
+> flinches in wonder and lets the phone slip from their hand. The instant the phone
+> hits the floor it bursts softly into glowing blue nodes connected by thin luminous
+> edges. The node network spreads outward in a chain reaction — across the floor, up
+> the lab bench, transforming beakers, the ALD equipment, and finally the researcher
+> themselves into constellations of glowing nodes and edges, until the entire
+> laboratory is a luminous knowledge graph floating in dark space. Tone of awe and
+> wonder, not horror; warm blue-white glow, cinematic, smooth continuous motion,
+> no text, no narration, no music, no watermark.
 
-> EN: Seamless continuation from this frame: the camera keeps pulling back from
-> night-time South Korea covered in a glowing blue node network, rising into space.
-> As the Earth's curvature appears, node clusters ignite across other continents,
-> connecting into one luminous planetary knowledge network covering the whole globe.
-> Slow majestic zoom-out ending on the full Earth from space, deep blue and white
-> glow palette, cinematic, no text, no narration, no music, no watermark.
+> KO: 이 프레임에서 심리스하게 이어서, 실험실에서 폰을 든 흰 가운 연구원의 뒷모습
+> 오버숄더 뷰: 연구원이 경이에 차 움찔하며 폰을 손에서 놓친다. 폰이 바닥에 닿는
+> 순간 부드럽게 터지며 가는 발광 엣지로 연결된 파란 노드들로 변한다. 노드 네트워크가
+> 연쇄 반응처럼 바깥으로 번진다 — 바닥을 타고, 실험대 위로, 비커와 ALD 장비, 그리고
+> 마침내 연구원 자신까지 빛나는 노드와 엣지의 성좌로 변환되어, 실험실 전체가 어두운
+> 공간에 떠 있는 발광 지식 그래프가 된다. 공포가 아니라 **경이와 감탄의 톤**, 따뜻한
+> 블루-화이트 발광, 시네마틱, 부드럽고 끊김 없는 모션. 텍스트·나레이션·음악·워터마크 없음.
 
-> KO: 이 프레임에서 심리스하게 이어서: 파란 발광 노드망으로 뒤덮인 밤의 대한민국에서
-> 카메라가 계속 뒤로 빠져 우주로 상승한다. 지구 곡률이 드러나면서 다른 대륙들에서도
-> 노드 클러스터가 연쇄 점화되어, 전 지구를 덮는 하나의 빛나는 행성 지식 네트워크로
-> 연결된다. 느리고 장엄한 줌아웃, 우주에서 본 지구 전체로 마무리, 딥블루·화이트 발광
-> 팔레트, 시네마틱. 텍스트·나레이션·음악·워터마크 없음.
+### 박자 4 (24~27.5s) — AI 클립 D2: 노드 실험실 → 플라스크 담김 → 정면 샷
 
-**클립 C — 지구 → 플라스크 담김 → 정면 샷 (약 3.5초)**
-(시작 이미지: 클립 B 마지막 프레임)
+(시작 이미지: D1 마지막 프레임)
 
-> EN: Seamless continuation from this frame: the glowing node-covered Earth shrinks
-> and gently falls downward into the wide mouth of a giant transparent laboratory
-> Erlenmeyer flask below, camera looking straight down from high above into the flask
-> as the miniature luminous planet drops in and settles inside the glass, glowing
-> softly like a captured constellation. Then the camera sweeps down in one smooth arc
-> from the top-down view to an eye-level front view of the flask standing on a clean
-> dark surface, the tiny glowing Earth floating inside the glass. Cinematic product-shot
-> lighting, deep blue and white glow palette, smooth camera path, no text, no narration,
-> no music, no watermark.
+> EN: Seamless continuation from this frame: the entire laboratory made of glowing
+> blue nodes and edges begins to swirl gently and contract, flowing downward like a
+> luminous liquid constellation into the wide mouth of a giant transparent
+> Erlenmeyer flask below, camera looking down from above as the node-lab settles
+> glowing inside the glass. Then the camera sweeps down in one smooth arc to an
+> eye-level front view of the flask standing on a clean dark surface, the miniature
+> glowing laboratory network floating inside. Cinematic product-shot lighting, deep
+> blue and white glow palette, smooth camera path, no text, no narration, no music,
+> no watermark.
 
-> KO: 이 프레임에서 심리스하게 이어서: 노드로 뒤덮인 발광하는 지구가 작아지며 아래에
-> 놓인 거대한 투명 삼각 플라스크의 넓은 입구로 부드럽게 떨어진다. 카메라는 플라스크
-> 바로 위에서 수직으로 내려다보며, 미니어처 발광 행성이 유리 안에 담겨 자리잡는 것을
-> 담는다 — 포획된 성좌처럼 은은하게 빛난다. 이어 카메라가 한 번의 부드러운 호를 그리며
-> 탑다운에서 **아이레벨 정면 샷**으로 내려온다: 어두운 깔끔한 표면 위에 선 플라스크,
-> 유리 안에 작은 발광 지구가 떠 있다. 시네마틱 제품 촬영 조명, 딥블루·화이트 발광
-> 팔레트, 부드러운 카메라 경로. 텍스트·나레이션·음악·워터마크 없음.
+> KO: 이 프레임에서 심리스하게 이어서: 발광하는 파란 노드와 엣지로 이루어진 실험실
+> 전체가 부드럽게 소용돌이치며 수축하고, 빛나는 액체 성좌처럼 아래에 놓인 거대한
+> 투명 삼각 플라스크의 넓은 입구로 흘러 들어간다. 카메라는 위에서 내려다보며 노드
+> 실험실이 유리 안에 담겨 빛나는 것을 담는다. 이어 카메라가 한 번의 부드러운 호를
+> 그리며 **아이레벨 정면 샷**으로 내려온다: 어두운 깔끔한 표면 위에 선 플라스크,
+> 그 안에 미니어처 발광 실험실 네트워크가 떠 있다. 시네마틱 제품 촬영 조명, 딥블루·
+> 화이트 발광 팔레트, 부드러운 카메라 경로. 텍스트·나레이션·음악·워터마크 없음.
 
-- 컷 4 실녹화 끝 프레임과 클립 A 첫 프레임이 같은 그림이므로 이음새는 하드컷으로
-  충분하다 (어긋나면 0.2초 디졸브).
-- 생성 결과에서 노드 색·배경이 앱과 너무 다르면, 프롬프트 맨 앞에 "Match the exact
-  colors of the input image."를 추가해 재생성.
-- **클립 C 폴백**: 탑다운→정면 카메라 이동을 한 클립에서 못 뽑으면 둘로 쪼갠다 —
-  C1(담기는 탑다운)과 C2(정면 제품 샷, C1 마지막 프레임 기반 이미지 생성 후 미세 모션)
-  를 하드컷으로 붙여도 어색하지 않다.
+- **폴백**: D1에서 놀람·낙하가 잘 안 뽑히면 낙하를 생략하고 "폰 화면에서 노드가
+  흘러넘쳐 실험실로 번진다"로 단순화해도 서사는 성립한다. D2의 탑다운→정면 이동이
+  한 클립에 안 되면 담기는 탑다운에서 끊고, 정면 샷은 이미지 생성 후 미세 모션으로.
 
 ## 컷 6 — 줌아웃 → 화이트 → 로고 (27.5~30초)
 
-- 클립 C의 정면 샷에서 **줌아웃하며 마무리**: 캡컷에서 클립 C 끝부분에 배율 키프레임
-  (100% → 60%)을 걸어 플라스크가 멀어지게 하고, 동시에 흰색 오버레이를 0%→100%로
-  페이드인 — 화면이 하얗게 비워진다.
-- 흰 화면 위에 **LAB GENE 로고**(플라스크 엠블럼 + 워드마크) 페이드인, 아래 작게
+- 클립 D2 정면 샷 끝에 배율 키프레임(100%→60%)으로 플라스크가 멀어지게 하고,
+  동시에 흰 오버레이 0%→100% 페이드인.
+- 흰 화면 위 **LAB GENE 로고**(플라스크 엠블럼+워드마크) 페이드인, 아래 작게
   "연구실의 경험을 자산으로". 1.5초 홀드 후 끝.
-- 방금 화면에서 멀어진 지구 담긴 플라스크와 로고의 플라스크 실루엣이 겹쳐 보이도록
-  로고를 화면 중앙 같은 위치에 배치하면 리빌이 자연스럽다.
+- 방금 멀어진 플라스크와 로고의 플라스크 실루엣이 같은 중앙 위치에 겹치게 배치.
 
 ---
 
 ## 녹화분(컷 3~4) 모션그래픽 레시피 — CapCut
 
-밋밋한 화면 녹화를 "제작된 영상"으로 바꾸는 처리 6가지. 전부 캡컷 무료 기능이다.
+1. **프레임 연출 (필수)** — 그라데이션 배경 + 녹화 클립 95% 크기·라운드·그림자.
+   단, 컷 4 끝(그래프)에서는 100%로 되돌려 컷 5 합성과 이음새를 맞춘다.
+2. **줌 키프레임** — 행동 지점으로 130~150% 줌. 컷당 2회 이내.
+3. **스포트라이트** — 구조 패널 완성 순간, 마스크로 주변 -40% 어둡게.
+4. **클릭 리플** — 칩·저장 클릭에 0.3초 원형 팝.
+5. **라벨 슬라이드인** — 빨간 텍스트+지시선, 컷 3 "자연어 입력"·컷 4 "재질문" 2개만.
+6. **속도 램프** — 타이핑·로딩 2~3배속, 핵심 순간 정속.
 
-1. **프레임 연출 (가장 효과 큼)** — 녹화본을 그대로 꽉 채우지 말고: 배경에 은은한
-   그라데이션(네이비→블랙) 깔고, 녹화 클립을 95% 크기로 올려 모서리 라운드 + 그림자.
-   순간적으로 "SaaS 광고 룩"이 된다. 단, 컷 4 끝(그래프)에서는 클립을 100%로 키워
-   프레임을 없애야 컷 5와 이음새가 맞는다.
-2. **줌 키프레임** — 클립의 배율·위치에 키프레임 2개: 행동 직전(100%) → 행동 지점
-   (130~150%, 해당 영역 중앙). 클릭·입력마다 카메라가 따라다니는 느낌. 컷당 2회 이내.
-3. **스포트라이트** — 구조 패널이 채워지는 순간: 클립 복제 → 위 클립에 마스크(패널
-   영역) → 아래 클립 밝기 -40%. 주변이 어두워지고 패널만 빛난다.
-4. **클릭 리플** — 칩 클릭·저장 클릭 순간에 스티커 "click circle" 또는 원형 도형을
-   0.3초 스케일 팝으로.
-5. **라벨 슬라이드인** — 빨간 텍스트 + 꺾인 지시선(스티커 "arrow"), 등장 0.3초
-   슬라이드인, 사라질 때 페이드. 화면당 최대 2개.
-6. **속도 램프** — 타이핑·로딩 구간 2~3배속, 재질문 답변·구조 패널 완성 순간은 정속.
-
-지름길: 녹화 자체를 **클릭 자동 줌 녹화 툴**(크롬 확장 Cursorful 류)로 하면 2번이
-공짜다. 그 결과물에 1·5·6번만 얹어도 충분히 간지난다. 전부 할 필요 없다 —
-**1번은 필수, 나머지는 시간 되는 만큼.**
+지름길: 클릭 자동 줌 녹화 툴(크롬 확장 Cursorful 류)로 찍으면 2번이 공짜.
 
 ## 편집 체크리스트
 
-- [ ] 총 길이 29초 내외 (발화가 밀리면 영상이 먼저 끝나는 게 낫다)
-- [ ] 라벨은 발화 키워드와 동일 단어만: 자연어 입력 / AI 구조화 / 재질문
-- [ ] 컷 4 끝 그래프 프레임 = 컷 5 클립 A 첫 프레임 (이음새 확인)
-- [ ] **효과음** (CapCut 내장 라이브러리, 볼륨 40~60%):
-  - 컷 2 화이트 플래시 → 짧은 우시(whoosh)
-  - 컷 4 재질문 칩 클릭 → 가벼운 UI 탭음, 저장 → 확정음 1회
-  - 컷 4 그래프 진입 + 컷 5 노드 증식 → 연쇄 팝(pop) 사운드
-  - 컷 5 대한민국→지구 줌아웃 → 낮게 깔리는 라이저(riser) 하나
-  - 컷 5 지구가 플라스크에 담기는 순간 → 유리에 담기는 청량한 "퐁" 한 번
-  - 컷 6 로고 페이드인 → 잔잔한 임팩트/스파클음
-- [ ] BGM·나레이션 없음, AI 생성 클립에 딸려온 오디오 트랙 삭제
-- [ ] 현장 리허설에서 스피커로 확인 — 효과음 과하면 파워포인트에서 영상 음소거
+- [ ] 총 29초 내외 (발화가 밀리면 영상이 먼저 끝나는 게 낫다)
+- [ ] 컷 1 마지막 프레임 = D1 시작 이미지 / 컷 4 그래프 프레임 = 박자 1 합성 소스 /
+      D1 마지막 프레임 = D2 시작 이미지
+- [ ] **효과음** (캡컷 내장, 볼륨 40~60%):
+  - 컷 2 화이트 플래시 → 우시(whoosh)
+  - 컷 4 칩 클릭 → UI 탭음, 저장 → 확정음
+  - 컷 4 그래프 진입 → 연쇄 팝(pop)
+  - 컷 5 폰 낙하·노드 변환 → 팝 + 낮은 라이저(riser)
+  - 컷 5 플라스크 담김 → 청량한 "퐁"
+  - 컷 6 로고 → 잔잔한 스파클음
+- [ ] BGM·나레이션 없음, AI 클립의 자체 오디오 삭제
+- [ ] 현장 리허설에서 소리 확인 — 과하면 파워포인트에서 영상 음소거
 - [ ] 1080p 30fps 내보내기
